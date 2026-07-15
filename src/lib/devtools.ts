@@ -5,6 +5,10 @@ export function hasDockedDeveloperTools(): boolean {
 }
 
 export function isDeveloperToolsShortcut(event: KeyboardEvent): boolean {
+  if (typeof event.key !== "string") {
+    return false;
+  }
+
   if (event.key === "F12") {
     return true;
   }

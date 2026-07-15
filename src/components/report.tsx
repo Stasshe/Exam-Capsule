@@ -47,9 +47,18 @@ type ReportProps = {
   busy: boolean;
   error: string;
   onRetry(): void;
+  onReturnHome(): void;
 };
 
-export function Report({ report, score, questionCount, busy, error, onRetry }: ReportProps) {
+export function Report({
+  report,
+  score,
+  questionCount,
+  busy,
+  error,
+  onRetry,
+  onReturnHome,
+}: ReportProps) {
   const [copyStatus, setCopyStatus] = useState("");
   let riskLevel = "低い";
   if (report?.risk.level === "medium") {
@@ -141,14 +150,24 @@ export function Report({ report, score, questionCount, busy, error, onRetry }: R
           </section>
         </div>
       )}
-      <button
-        className="mt-7 bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-cyan-700 disabled:opacity-40"
-        type="button"
-        disabled={busy}
-        onClick={onRetry}
-      >
-        もう一度挑戦する
-      </button>
+      <div className="mt-7 flex flex-wrap gap-3">
+        <button
+          className="bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-cyan-700 disabled:opacity-40"
+          type="button"
+          disabled={busy}
+          onClick={onRetry}
+        >
+          もう一度挑戦する
+        </button>
+        <button
+          className="border border-slate-400 bg-white px-5 py-3 text-sm font-semibold transition hover:border-cyan-700 hover:text-cyan-800 disabled:opacity-40"
+          type="button"
+          disabled={busy}
+          onClick={onReturnHome}
+        >
+          トップページに戻る
+        </button>
+      </div>
       {error && <p className="mt-5 text-sm text-rose-700">{error}</p>}
     </div>
   );

@@ -585,6 +585,16 @@ export default function Home() {
     await startExam();
   }
 
+  function returnHome() {
+    sessionStorage.removeItem(sessionStorageKey);
+    setCredentials(null);
+    setExam(null);
+    setReport(null);
+    setSelectedOption("");
+    setPendingEvents(0);
+    setError("");
+  }
+
   async function installApp() {
     setBusy(true);
     setInstallMessage("");
@@ -671,6 +681,7 @@ export default function Home() {
       busy={busy}
       error={error}
       onRetry={() => void retryExam()}
+      onReturnHome={returnHome}
     />
   );
   if (exam.status === "active") {

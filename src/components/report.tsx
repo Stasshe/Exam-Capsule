@@ -135,14 +135,9 @@ export function Report({ report, score, questionCount, busy, error, onRetry }: R
                 </button>
               </div>
             </div>
-            <details className="mt-3 border border-slate-300">
-              <summary className="cursor-pointer px-4 py-3 text-sm font-medium">
-                受理データの全文を表示
-              </summary>
-              <pre className="max-h-80 overflow-auto border-t border-slate-300 bg-slate-950 p-4 text-xs text-slate-100">
-                {JSON.stringify(report.received, null, 2)}
-              </pre>
-            </details>
+            <pre className="mt-3 max-h-[32rem] overflow-auto border border-slate-300 bg-slate-950 p-4 text-xs text-slate-100">
+              {JSON.stringify(report.received, null, 2)}
+            </pre>
           </section>
         </div>
       )}

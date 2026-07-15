@@ -1,6 +1,7 @@
 import type { EvidenceEvent, JsonObject, JsonValue } from "@/lib/evidence";
 
-const candidateNamePattern = /^[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}A-Za-z '\-ー]+$/u;
+const candidateNamePattern =
+  /^[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}A-Za-z '\-ー]+$/u;
 const candidateNameLetterPattern = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}A-Za-z]/u;
 
 export function candidateNameError(value: string): string | null {
@@ -11,7 +12,10 @@ export function candidateNameError(value: string): string | null {
   if ([...candidateName].length > 80) {
     return "受験者名は1〜80文字で入力してください。";
   }
-  if (!candidateNamePattern.test(candidateName) || !candidateNameLetterPattern.test(candidateName)) {
+  if (
+    !candidateNamePattern.test(candidateName) ||
+    !candidateNameLetterPattern.test(candidateName)
+  ) {
     return "受験者名には日本語、英字、半角スペース、ハイフン、アポストロフィだけを使用してください。";
   }
   return null;

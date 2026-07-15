@@ -17,10 +17,13 @@ pnpm dev
 
 証跡確認では `.env.local` の `REVIEWER_KEY` を入力する。
 
+ブラウザで受験URLを開き、表示されるインストール操作を行う。インストール後はOSのアプリアイコンから起動する。通常browser tabでは試験を開始できない。VercelではHTTPSが自動提供される。
+
 ## 実装範囲
 
 - FullscreenとKeyboard Lockの要求、離脱状態と警告音
-- 専用popupへの受験画面分離と、dockされたDeveloper Toolsの開始前検査
+- install可能なPWA、standalone app window、browser tabからの受験拒否
+- dockされたDeveloper Toolsの開始前検査
 - `visibilitychange`、focus、resize、キー種別、選択、クリップボード、context menuの記録。キー長押しrepeatは除外し、選択試行は5秒単位で抑制
 - 受験者、session、時刻を含む動的透かし
 - IndexedDBへ先に保存するevent outbox
@@ -35,5 +38,7 @@ pnpm dev
 サーバーデータは単一Next.js Function内のメモリへ保存する。再起動、再デプロイ、scale-outで消失または別インスタンスへ分離する。APIを1つのcatch-all Route Handlerへまとめているが、Vercel上の永続性は保証しない。本番化では `src/lib/store.ts` の境界を永続DBへ置き換える。
 
 通常ブラウザ上のJavaScriptは改造可能であり、このデモは不正不可能性を証明しない。検出と通常クライアントにおける証跡欠落の低減を扱う。
+
+Service Workerによるoffline受験は提供しない。問題進行、回答確定、証跡受理にはserver接続が必要。
 
 詳細は [SPECIFICATION.md](SPECIFICATION.md) と [EVIDENCE_INTENT.md](EVIDENCE_INTENT.md) を参照。

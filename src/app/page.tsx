@@ -1,9 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Landing } from "@/components/landing";
 import { messageFromError } from "@/lib/errors";
 import type { EvidenceEvent, JsonObject } from "@/lib/evidence";
+import { type InstallPromptEvent, isInstalledDisplayMode } from "@/lib/install";
 import { appendEvidence, countPending, flushEvidence, initializeOutbox } from "@/lib/outbox";
 import type { Question } from "@/lib/questions";
 
@@ -63,7 +64,6 @@ type KeyboardNavigator = Navigator & {
 };
 
 const sessionStorageKey = "exam-capsule-session";
-const launchCandidateKey = "exam-capsule-launch-candidate";
 
 function hasDockedDeveloperTools(): boolean {
   const widthDifference = Math.max(0, window.outerWidth - window.innerWidth);
@@ -156,7 +156,9 @@ export default function Home() {
   const [fullscreen, setFullscreen] = useState(false);
   const [keyboardLocked, setKeyboardLocked] = useState(false);
   const [report, setReport] = useState<ExamReport | null>(null);
-  const [capsuleWindow, setCapsuleWindow] = useState(false);
+  const [installMode, setInstallMode] = useState<"checking" | "browser" | "installed">("checking");
+  const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
+  const [installMessage, setInstallMessage] = useState("");
   const [now, setNow] = useState(() => new Date());
   const resizeTimer = useRef<number | null>(null);
   const intentionalFullscreenExit = useRef(false);
@@ -202,19 +204,42 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    const parameters = new URLSearchParams(window.location.search);
-    if (parameters.get("capsule") !== "1") {
-      return;
-    }
-    setCapsuleWindow(true);
-    const launchCandidate = sessionStorage.getItem(launchCandidateKey);
-    if (launchCandidate) {
-      setCandidateName(launchCandidate);
-      sessionStorage.removeItem(launchCandidateKey);
-    }
+    const updateMode = () => {
+      if (isInstalledDisplayMode()) {
+        setInstallMode("installed");
+        return;
+      }
+      setInstallMode("browser");
+    };
+    const captureInstallPrompt = (event: Event) => {
+      event.preventDefault();
+      setInstallPrompt(event as InstallPromptEvent);
+    };
+    const markInstalled = () => {
+      setInstallPrompt(null);
+      setInstallMessage("インストールが完了しました。OSのアプリアイコンから起動してください。");
+    };
+
+    const standaloneQuery = window.matchMedia("(display-mode: standalone)");
+    const fullscreenQuery = window.matchMedia("(display-mode: fullscreen)");
+    updateMode();
+    standaloneQuery.addEventListener("change", updateMode);
+    fullscreenQuery.addEventListener("change", updateMode);
+    window.addEventListener("beforeinstallprompt", captureInstallPrompt);
+    window.addEventListener("appinstalled", markInstalled);
+
+    return () => {
+      standaloneQuery.removeEventListener("change", updateMode);
+      fullscreenQuery.removeEventListener("change", updateMode);
+      window.removeEventListener("beforeinstallprompt", captureInstallPrompt);
+      window.removeEventListener("appinstalled", markInstalled);
+    };
   }, []);
 
   useEffect(() => {
+    if (installMode !== "installed") {
+      return;
+    }
     const stored = parseStoredCredentials();
     if (!stored) {
       return;
@@ -244,7 +269,7 @@ export default function Home() {
       }
     };
     void restore();
-  }, [loadReport, refreshPending]);
+  }, [installMode, loadReport, refreshPending]);
 
   useEffect(() => {
     if (!credentials || exam?.status !== "active") {
@@ -405,6 +430,10 @@ export default function Home() {
   }
 
   async function startExam() {
+    if (installMode !== "installed") {
+      setError("インストール済みのExam Capsuleから起動してください。");
+      return;
+    }
     if (!candidateName.trim()) {
       setError("受験者名を入力してください。");
       return;
@@ -505,111 +534,44 @@ export default function Home() {
     await startExam();
   }
 
-  function launchCapsuleWindow() {
-    if (!candidateName.trim()) {
-      setError("受験者名を入力してください。");
+  async function installApp() {
+    if (!installPrompt) {
+      setInstallMessage(
+        "ブラウザメニューの「アプリをインストール」または「ホーム画面に追加」を使用してください。",
+      );
       return;
     }
-    if (hasDockedDeveloperTools()) {
-      setError("開発者ツールを閉じてから専用ウィンドウを開いてください。");
-      return;
-    }
-
-    const width = Math.min(1280, window.screen.availWidth);
-    const height = Math.min(900, window.screen.availHeight);
-    const left = Math.max(0, Math.round((window.screen.availWidth - width) / 2));
-    const top = Math.max(0, Math.round((window.screen.availHeight - height) / 2));
-    const features = `popup=yes,width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`;
-    const popup = window.open("about:blank", "_blank", features);
-    if (!popup) {
-      setError("専用ウィンドウを開けません。popupを許可してください。");
-      return;
-    }
-
+    setBusy(true);
+    setInstallMessage("");
     try {
-      popup.sessionStorage.setItem(launchCandidateKey, candidateName.trim());
-      popup.opener = null;
-      popup.location.href = "/?capsule=1";
-      popup.focus();
-      setError("");
-    } catch {
-      popup.close();
-      setError("専用ウィンドウを初期化できませんでした。");
+      await installPrompt.prompt();
+      const choice = await installPrompt.userChoice;
+      setInstallPrompt(null);
+      if (choice.outcome === "accepted") {
+        setInstallMessage("インストール後、OSのアプリアイコンからExam Capsuleを起動してください。");
+        return;
+      }
+      setInstallMessage("インストールはキャンセルされました。");
+    } catch (installError) {
+      setInstallMessage(messageFromError(installError, "インストールを開始できませんでした。"));
+    } finally {
+      setBusy(false);
     }
   }
 
   if (!exam) {
-    let startButtonLabel = "専用ウィンドウを開く";
-    if (capsuleWindow) {
-      startButtonLabel = "試験を開始";
-    }
-    if (busy) {
-      startButtonLabel = "試験環境を準備中…";
-    }
     return (
-      <main className="min-h-screen bg-slate-950 px-6 py-10 text-slate-100">
-        <div className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-6xl flex-col">
-          <header className="flex items-center justify-between border-b border-slate-800 pb-5">
-            <div>
-              <p className="font-mono text-xs tracking-[0.22em] text-cyan-400">EXAM CAPSULE</p>
-              <h1 className="mt-2 text-xl font-semibold">操作証跡付きブラウザ試験</h1>
-            </div>
-            <Link className="text-sm text-slate-400 hover:text-white" href="/review">
-              証跡を確認
-            </Link>
-          </header>
-
-          <section className="grid flex-1 items-center gap-12 py-16 lg:grid-cols-[1.2fr_0.8fr]">
-            <div>
-              <p className="max-w-xl text-4xl font-semibold leading-tight tracking-tight sm:text-6xl">
-                できるだけ不正をしてみろ（パソコン１台の使用のみとする）
-              </p>
-              <p className="mt-6 max-w-2xl text-base leading-7 text-slate-400">
-                フォーカス、フルスクリーン、キー種別、クリップボード操作、回答進行を監視します。
-                イベントは送信前に端末内でハッシュチェーンへ保存されます。
-              </p>
-            </div>
-
-            <div className="border border-slate-700 bg-slate-900 p-7 shadow-2xl shadow-black/30">
-              <label className="text-sm font-medium text-slate-300" htmlFor="candidate-name">
-                受験者名
-              </label>
-              <input
-                id="candidate-name"
-                className="mt-3 w-full border border-slate-600 bg-slate-950 px-4 py-3 outline-none transition focus:border-cyan-400"
-                maxLength={80}
-                value={candidateName}
-                onChange={(event) => setCandidateName(event.target.value)}
-                disabled={busy}
-              />
-              <button
-                className="mt-5 w-full bg-cyan-400 px-4 py-3 font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"
-                type="button"
-                onClick={() => {
-                  if (capsuleWindow) {
-                    void startExam();
-                    return;
-                  }
-                  launchCapsuleWindow();
-                }}
-                disabled={busy}
-              >
-                {startButtonLabel}
-              </button>
-              <p className="mt-4 text-xs leading-5 text-slate-500">
-                {capsuleWindow &&
-                  "開始時にフルスクリーンを要求し、対応ブラウザではKeyboard Lockも使用します。"}
-                {!capsuleWindow && "試験は通常の画面から分離した専用ウィンドウで実行します。"}
-              </p>
-              {error && (
-                <p className="mt-4 border-l-2 border-rose-400 pl-3 text-sm text-rose-300">
-                  {error}
-                </p>
-              )}
-            </div>
-          </section>
-        </div>
-      </main>
+      <Landing
+        candidateName={candidateName}
+        error={error}
+        busy={busy}
+        installMode={installMode}
+        installAvailable={installPrompt !== null}
+        installMessage={installMessage}
+        onCandidateNameChange={setCandidateName}
+        onInstall={() => void installApp()}
+        onStart={() => void startExam()}
+      />
     );
   }
 

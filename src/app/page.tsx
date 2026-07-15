@@ -58,6 +58,7 @@ type ExamReport = {
 type KeyboardNavigator = Navigator & {
   keyboard?: {
     lock(keys?: string[]): Promise<void>;
+    unlock?: () => void;
   };
 };
 
@@ -129,6 +130,7 @@ export default function Home() {
   const [report, setReport] = useState<ExamReport | null>(null);
   const [now, setNow] = useState(() => new Date());
   const resizeTimer = useRef<number | null>(null);
+  const intentionalFullscreenExit = useRef(false);
 
   const refreshPending = useCallback(async (sessionId: string) => {
     setPendingEvents(await countPending(sessionId));
@@ -234,6 +236,10 @@ export default function Home() {
         void record("fullscreen.enter");
         return;
       }
+      if (intentionalFullscreenExit.current) {
+        intentionalFullscreenExit.current = false;
+        return;
+      }
       void record("fullscreen.exit");
     };
     const onBlur = () => void record("window.blur");
@@ -329,6 +335,20 @@ export default function Home() {
     return { fullscreen: enteredFullscreen, keyboard: lockedKeyboard };
   }
 
+  async function exitProtectedMode(): Promise<void> {
+    const keyboard = (navigator as KeyboardNavigator).keyboard;
+    if (keyboard?.unlock) {
+      keyboard.unlock();
+    }
+    setKeyboardLocked(false);
+
+    if (document.fullscreenElement) {
+      intentionalFullscreenExit.current = true;
+      await document.exitFullscreen();
+    }
+    setFullscreen(false);
+  }
+
   async function startExam() {
     if (!candidateName.trim()) {
       setError("受験者名を入力してください。");
@@ -403,6 +423,7 @@ export default function Home() {
       setSelectedOption("");
       await flush();
       if (nextExam.status === "submitted") {
+        await exitProtectedMode();
         await loadReport(credentials);
       }
     } catch (submitError) {
@@ -415,6 +436,15 @@ export default function Home() {
   async function returnToFullscreen() {
     const protectedMode = await enterProtectedMode();
     await record("protected_mode.request", protectedMode);
+  }
+
+  async function retryExam() {
+    sessionStorage.removeItem(sessionStorageKey);
+    setReport(null);
+    setSelectedOption("");
+    setPendingEvents(0);
+    setError("");
+    await startExam();
   }
 
   if (!exam) {
@@ -570,6 +600,14 @@ export default function Home() {
           </section>
         </div>
       )}
+      <button
+        className="mt-7 bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-cyan-700 disabled:opacity-40"
+        type="button"
+        disabled={busy}
+        onClick={() => void retryExam()}
+      >
+        もう一度挑戦する
+      </button>
       {error && <p className="mt-5 text-sm text-rose-700">{error}</p>}
     </div>
   );

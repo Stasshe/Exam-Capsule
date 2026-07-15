@@ -4,7 +4,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Exam Capsule",
-  description: "A controlled browser assessment with verifiable interaction evidence.",
+  description: "検証可能な操作証跡を持つブラウザ試験デモ。",
 };
 
 export default function RootLayout({
@@ -13,7 +13,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="ja">
       <body className="bg-background text-foreground antialiased">{children}</body>
     </html>
   );

@@ -9,6 +9,7 @@ import {
   authenticateReviewer,
   createSession,
   getReviewSessions,
+  getSessionReport,
   getSessionState,
 } from "@/lib/store";
 import { isEvidenceEvent, isObject } from "@/lib/validation";
@@ -39,6 +40,17 @@ function readExam(request: NextRequest): Response {
     return errorResponse("The exam session is not available.", 401);
   }
   return Response.json(getSessionState(session));
+}
+
+function readReport(request: NextRequest): Response {
+  const session = getAuthenticatedSession(request);
+  if (!session) {
+    return errorResponse("The exam session is not available.", 401);
+  }
+  if (session.status !== "submitted") {
+    return errorResponse("The report is available after submission.", 409);
+  }
+  return Response.json(getSessionReport(session));
 }
 
 async function saveAnswer(request: NextRequest): Promise<Response> {
@@ -109,6 +121,9 @@ export async function GET(request: NextRequest, context: RouteContext): Promise<
   }
   if (path.length === 1 && path[0] === "review") {
     return reviewSessions(request);
+  }
+  if (path.length === 1 && path[0] === "report") {
+    return readReport(request);
   }
   return errorResponse("API endpoint not found.", 404);
 }

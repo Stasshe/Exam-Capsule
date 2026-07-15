@@ -26,6 +26,29 @@ type SessionCredentials = {
   candidateName: string;
 };
 
+type ExamReport = {
+  risk: {
+    score: number;
+    level: "low" | "medium" | "high";
+    signals: {
+      fullscreenExits: number;
+      hiddenEvents: number;
+      hiddenDurationSeconds: number;
+      clipboardAttempts: number;
+      focusLosses: number;
+      resizeEvents: number;
+      shortcutEvents: number;
+    };
+  };
+  received: {
+    answerCount: number;
+    eventCount: number;
+    acceptedThrough: number;
+    answers: JsonObject[];
+    events: JsonObject[];
+  };
+};
+
 type KeyboardNavigator = Navigator & {
   keyboard?: {
     lock(keys?: string[]): Promise<void>;
@@ -97,6 +120,7 @@ export default function Home() {
   const [pendingEvents, setPendingEvents] = useState(0);
   const [fullscreen, setFullscreen] = useState(false);
   const [keyboardLocked, setKeyboardLocked] = useState(false);
+  const [report, setReport] = useState<ExamReport | null>(null);
   const [now, setNow] = useState(() => new Date());
   const resizeTimer = useRef<number | null>(null);
 
@@ -131,6 +155,14 @@ export default function Home() {
     }
   }, [credentials, refreshPending]);
 
+  const loadReport = useCallback(async (session: SessionCredentials) => {
+    const response = await fetch("/api/report", { headers: sessionHeaders(session) });
+    if (!response.ok) {
+      throw new Error(await readError(response));
+    }
+    setReport((await response.json()) as ExamReport);
+  }, []);
+
   useEffect(() => {
     const stored = parseStoredCredentials();
     if (!stored) {
@@ -150,6 +182,9 @@ export default function Home() {
         setCandidateName(stored.candidateName);
         setExam(restoredExam);
         await refreshPending(stored.sessionId);
+        if (restoredExam.status === "submitted") {
+          await loadReport(stored);
+        }
       } catch (restoreError) {
         sessionStorage.removeItem(sessionStorageKey);
         setError(messageFromError(restoreError, "Session restoration failed."));
@@ -158,7 +193,7 @@ export default function Home() {
       }
     };
     void restore();
-  }, [refreshPending]);
+  }, [loadReport, refreshPending]);
 
   useEffect(() => {
     if (!credentials || exam?.status !== "active") {
@@ -361,6 +396,9 @@ export default function Home() {
       setExam(nextExam);
       setSelectedOption("");
       await flush();
+      if (nextExam.status === "submitted") {
+        await loadReport(credentials);
+      }
     } catch (submitError) {
       setError(messageFromError(submitError, "The answer could not be submitted."));
     } finally {
@@ -374,9 +412,9 @@ export default function Home() {
   }
 
   if (!exam) {
-    let startButtonLabel = "Enter exam";
+    let startButtonLabel = "試験を開始";
     if (busy) {
-      startButtonLabel = "Preparing environment…";
+      startButtonLabel = "試験環境を準備中…";
     }
     return (
       <main className="min-h-screen bg-slate-950 px-6 py-10 text-slate-100">
@@ -384,27 +422,27 @@ export default function Home() {
           <header className="flex items-center justify-between border-b border-slate-800 pb-5">
             <div>
               <p className="font-mono text-xs tracking-[0.22em] text-cyan-400">EXAM CAPSULE</p>
-              <h1 className="mt-2 text-xl font-semibold">Controlled assessment environment</h1>
+              <h1 className="mt-2 text-xl font-semibold">操作証跡付きブラウザ試験</h1>
             </div>
             <Link className="text-sm text-slate-400 hover:text-white" href="/review">
-              Evidence review
+              証跡を確認
             </Link>
           </header>
 
           <section className="grid flex-1 items-center gap-12 py-16 lg:grid-cols-[1.2fr_0.8fr]">
             <div>
               <p className="max-w-xl text-4xl font-semibold leading-tight tracking-tight sm:text-6xl">
-                A browser exam with a verifiable interaction trail.
+                受験中の操作を、検証できる証跡に。
               </p>
               <p className="mt-6 max-w-2xl text-base leading-7 text-slate-400">
-                The demo monitors focus, fullscreen, keyboard categories, clipboard attempts, and
-                answer progression. Events are chained locally before delivery.
+                フォーカス、フルスクリーン、キー種別、クリップボード操作、回答進行を監視します。
+                イベントは送信前に端末内でハッシュチェーンへ保存されます。
               </p>
             </div>
 
             <div className="border border-slate-700 bg-slate-900 p-7 shadow-2xl shadow-black/30">
               <label className="text-sm font-medium text-slate-300" htmlFor="candidate-name">
-                Candidate name
+                受験者名
               </label>
               <input
                 id="candidate-name"
@@ -423,7 +461,7 @@ export default function Home() {
                 {startButtonLabel}
               </button>
               <p className="mt-4 text-xs leading-5 text-slate-500">
-                Starting requests fullscreen and Keyboard Lock where the browser supports it.
+                開始時にフルスクリーンを要求し、対応ブラウザではKeyboard Lockも使用します。
               </p>
               {error && (
                 <p className="mt-4 border-l-2 border-rose-400 pl-3 text-sm text-rose-300">
@@ -439,36 +477,74 @@ export default function Home() {
 
   const watermark = `${exam.candidateName} · ${exam.id.slice(0, 8)} · ${now.toLocaleTimeString()}`;
   let fullscreenClass = "text-rose-700";
-  let fullscreenLabel = "FULLSCREEN EXITED";
+  let fullscreenLabel = "全画面を離脱";
   if (fullscreen) {
     fullscreenClass = "text-emerald-700";
-    fullscreenLabel = "FULLSCREEN";
+    fullscreenLabel = "全画面";
   }
   let keyboardClass = "text-amber-700";
-  let keyboardLabel = "KEYS MONITORED";
+  let keyboardLabel = "キー監視中";
   if (keyboardLocked) {
     keyboardClass = "text-emerald-700";
-    keyboardLabel = "KEYS LOCKED";
+    keyboardLabel = "キー固定中";
   }
   let evidenceClass = "text-amber-700";
-  let evidenceLabel = `${pendingEvents} PENDING`;
+  let evidenceLabel = `未送信 ${pendingEvents}件`;
   if (pendingEvents === 0) {
     evidenceClass = "text-emerald-700";
-    evidenceLabel = "EVIDENCE SYNCED";
+    evidenceLabel = "証跡同期済み";
   }
-  let submitButtonLabel = "Submit answer";
+  let submitButtonLabel = "回答を確定";
   if (busy) {
-    submitButtonLabel = "Submitting…";
+    submitButtonLabel = "送信中…";
+  }
+
+  let riskLevel = "低い";
+  if (report?.risk.level === "medium") {
+    riskLevel = "要確認";
+  }
+  if (report?.risk.level === "high") {
+    riskLevel = "高い";
   }
 
   let examPanel = (
     <div className="w-full max-w-2xl border-t-4 border-emerald-600 bg-white p-10 shadow-sm">
-      <p className="font-mono text-xs tracking-widest text-emerald-700">SUBMISSION SEALED</p>
-      <h2 className="mt-4 text-4xl font-semibold">Exam complete</h2>
-      <p className="mt-4 text-slate-600">
-        Score: {exam.score} / {exam.questionCount}. Pending evidence remains in this browser until
-        acknowledged.
-      </p>
+      <p className="font-mono text-xs tracking-widest text-emerald-700">提出確定</p>
+      <h2 className="mt-4 text-4xl font-semibold">試験レポート</h2>
+      <p className="mt-4 text-slate-600">得点: {exam.score} / {exam.questionCount}</p>
+      {!report && <p className="mt-8 text-sm text-slate-500">サーバー受理データを集計中…</p>}
+      {report && (
+        <div className="mt-8 space-y-6">
+          <section className="border border-slate-300 bg-slate-50 p-5">
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">不審度の概算</p>
+            <div className="mt-2 flex items-end gap-3">
+              <strong className="font-mono text-5xl">{report.risk.score}</strong>
+              <span className="pb-1 text-sm text-slate-500">/ 100 · {riskLevel}</span>
+            </div>
+            <p className="mt-3 text-xs leading-5 text-slate-500">
+              不正の証明ではありません。確認対象を選ぶための参考値です。
+            </p>
+          </section>
+          <dl className="grid grid-cols-2 gap-px bg-slate-300 text-sm sm:grid-cols-4">
+            <div className="bg-white p-3"><dt className="text-xs text-slate-500">全画面離脱</dt><dd className="mt-1 font-mono">{report.risk.signals.fullscreenExits}</dd></div>
+            <div className="bg-white p-3"><dt className="text-xs text-slate-500">非表示</dt><dd className="mt-1 font-mono">{report.risk.signals.hiddenEvents}</dd></div>
+            <div className="bg-white p-3"><dt className="text-xs text-slate-500">Clipboard試行</dt><dd className="mt-1 font-mono">{report.risk.signals.clipboardAttempts}</dd></div>
+            <div className="bg-white p-3"><dt className="text-xs text-slate-500">Focus離脱</dt><dd className="mt-1 font-mono">{report.risk.signals.focusLosses}</dd></div>
+          </dl>
+          <section>
+            <h3 className="font-semibold">サーバーが受理したデータ</h3>
+            <p className="mt-2 text-sm text-slate-600">
+              回答 {report.received.answerCount}件 · イベント {report.received.eventCount}件 · 最終連番 {report.received.acceptedThrough}
+            </p>
+            <details className="mt-3 border border-slate-300">
+              <summary className="cursor-pointer px-4 py-3 text-sm font-medium">受理データの全文を表示</summary>
+              <pre className="max-h-80 overflow-auto border-t border-slate-300 bg-slate-950 p-4 text-xs text-slate-100">
+                {JSON.stringify(report.received, null, 2)}
+              </pre>
+            </details>
+          </section>
+        </div>
+      )}
       {error && <p className="mt-5 text-sm text-rose-700">{error}</p>}
     </div>
   );
@@ -476,7 +552,7 @@ export default function Home() {
     examPanel = (
       <div className="w-full max-w-3xl bg-white p-7 shadow-sm sm:p-10">
         <p className="font-mono text-xs tracking-widest text-cyan-700">
-          QUESTION {exam.questionNumber}
+          問題 {exam.questionNumber}
         </p>
         <h2 className="mt-5 text-2xl font-semibold leading-relaxed sm:text-3xl">
           {exam.question?.prompt}
@@ -500,7 +576,7 @@ export default function Home() {
           ))}
         </div>
         <div className="mt-8 flex items-center justify-between border-t border-slate-200 pt-6">
-          <p className="text-xs text-slate-500">Answers are final after submission.</p>
+          <p className="text-xs text-slate-500">確定した回答は変更できません。</p>
           <button
             className="bg-slate-950 px-6 py-3 font-semibold text-white transition hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-40"
             type="button"
@@ -553,20 +629,20 @@ export default function Home() {
 
       {!fullscreen && exam.status === "active" && (
         <div className="relative z-30 flex items-center justify-between bg-rose-700 px-5 py-3 text-sm text-white">
-          <span>Fullscreen was exited. This event has been recorded.</span>
+          <span>フルスクリーンを離脱しました。この操作は記録されています。</span>
           <button
             className="border border-white px-3 py-1 font-semibold"
             type="button"
             onClick={() => void returnToFullscreen()}
           >
-            Return to fullscreen
+            フルスクリーンへ戻る
           </button>
         </div>
       )}
 
       <section className="relative z-20 mx-auto grid min-h-[calc(100vh-53px)] max-w-7xl lg:grid-cols-[240px_1fr]">
         <aside className="border-r border-slate-300 bg-slate-200/70 p-5">
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Progress</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">進行状況</p>
           <p className="mt-3 text-3xl font-semibold">
             {exam.questionNumber}
             <span className="text-base text-slate-400"> / {exam.questionCount}</span>
@@ -579,11 +655,11 @@ export default function Home() {
           </div>
           <dl className="mt-10 space-y-4 text-xs">
             <div>
-              <dt className="text-slate-500">Session</dt>
+              <dt className="text-slate-500">セッション</dt>
               <dd className="mt-1 font-mono">{exam.id.slice(0, 13)}</dd>
             </div>
             <div>
-              <dt className="text-slate-500">Local time</dt>
+              <dt className="text-slate-500">端末時刻</dt>
               <dd className="mt-1 font-mono">{now.toLocaleTimeString()}</dd>
             </div>
           </dl>

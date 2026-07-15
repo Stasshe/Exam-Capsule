@@ -183,6 +183,93 @@ export function getReviewSessions() {
     }));
 }
 
+export function getSessionReport(session: ExamSession) {
+  const signals = {
+    fullscreenExits: 0,
+    hiddenEvents: 0,
+    hiddenDurationSeconds: 0,
+    clipboardAttempts: 0,
+    focusLosses: 0,
+    resizeEvents: 0,
+    shortcutEvents: 0,
+  };
+  let hiddenAt: number | null = null;
+
+  for (const event of session.events) {
+    if (event.type === "fullscreen.exit") {
+      signals.fullscreenExits += 1;
+    }
+    if (event.type === "document.hidden") {
+      signals.hiddenEvents += 1;
+      hiddenAt = event.clientMonotonicTime;
+    }
+    if (event.type === "document.visible" && hiddenAt !== null) {
+      const duration = Math.max(0, event.clientMonotonicTime - hiddenAt) / 1000;
+      signals.hiddenDurationSeconds += duration;
+      hiddenAt = null;
+    }
+    if (event.type.startsWith("clipboard.")) {
+      signals.clipboardAttempts += 1;
+    }
+    if (event.type === "window.blur") {
+      signals.focusLosses += 1;
+    }
+    if (event.type === "viewport.resize") {
+      signals.resizeEvents += 1;
+    }
+    if (event.type === "keyboard.input" && event.payload.category === "shortcut") {
+      signals.shortcutEvents += 1;
+    }
+  }
+
+  const hiddenDurationRisk = Math.min(30, signals.hiddenDurationSeconds);
+  const shortcutRisk = Math.min(10, signals.shortcutEvents);
+  const rawScore =
+    signals.fullscreenExits * 20 +
+    signals.hiddenEvents * 10 +
+    hiddenDurationRisk +
+    signals.clipboardAttempts * 15 +
+    signals.focusLosses * 5 +
+    signals.resizeEvents * 2 +
+    shortcutRisk;
+  const score = Math.min(100, Math.round(rawScore));
+  let level: "low" | "medium" | "high" = "low";
+  if (score >= 60) {
+    level = "high";
+  } else if (score >= 25) {
+    level = "medium";
+  }
+
+  const answers = session.answers.map((answer) => {
+    const question = getQuestionDefinition(answer.questionId);
+    const selectedOption = question?.options.find((option) => option.id === answer.optionId);
+    return {
+      questionId: answer.questionId,
+      prompt: question?.prompt ?? answer.questionId,
+      optionId: answer.optionId,
+      selectedLabel: selectedOption?.label ?? answer.optionId,
+      answeredAt: answer.answeredAt,
+      correct: question?.correctOptionId === answer.optionId,
+    };
+  });
+
+  return {
+    sessionId: session.id,
+    candidateName: session.candidateName,
+    status: session.status,
+    startedAt: session.startedAt,
+    submittedAt: session.submittedAt,
+    risk: { score, level, signals },
+    received: {
+      answerCount: answers.length,
+      eventCount: session.events.length,
+      acceptedThrough: session.events.at(-1)?.sequence ?? 0,
+      answers,
+      events: session.events,
+    },
+  };
+}
+
 export function authenticateReviewer(providedKey: string): "unavailable" | "accepted" | "rejected" {
   const reviewerKey = process.env.REVIEWER_KEY;
   if (!reviewerKey) {

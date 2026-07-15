@@ -14,7 +14,7 @@ type QuestionDefinition = Question & {
 const questions: QuestionDefinition[] = [
   {
     id: "arithmetic",
-    prompt: "What is 12 + 8?",
+    prompt: "12 + 8 はいくつですか？",
     options: [
       { id: "a", label: "18" },
       { id: "b", label: "20" },
@@ -25,18 +25,18 @@ const questions: QuestionDefinition[] = [
   },
   {
     id: "capital",
-    prompt: "What is the capital of Japan?",
+    prompt: "日本の首都はどこですか？",
     options: [
-      { id: "a", label: "Kyoto" },
-      { id: "b", label: "Osaka" },
-      { id: "c", label: "Tokyo" },
-      { id: "d", label: "Sapporo" },
+      { id: "a", label: "京都" },
+      { id: "b", label: "大阪" },
+      { id: "c", label: "東京" },
+      { id: "d", label: "札幌" },
     ],
     correctOptionId: "c",
   },
   {
     id: "web",
-    prompt: "Which protocol encrypts ordinary web traffic in transit?",
+    prompt: "通常のWeb通信を暗号化するプロトコルはどれですか？",
     options: [
       { id: "a", label: "HTTP" },
       { id: "b", label: "FTP" },

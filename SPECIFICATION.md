@@ -29,7 +29,7 @@ active session中、次を意味eventとして記録する。
 
 clipboard、context menu、selection、通常UIで抑止する。selection抑止は毎回行うが、証跡は5秒に1件までに制限する。透かし、受験者名、session断片、現在時刻を画面全体に置く。Fullscreen離脱、即表示する。
 
-意図しないFullscreen離脱、約0.6秒の警告音を鳴らす。試験提出による自動離脱、鳴らさない。
+意図しないFullscreen離脱、音程が上下する約4秒の警告音を鳴らす。試験提出による自動離脱、鳴らさない。
 
 重要表示、750msごとにserver由来の問題dataとDOM textを照合する。computed style、寸法、中央点の最前面elementも見る。異常を1回だけ`content.integrity_failure`として保存し、session中の回答を停止する。拡張機能名の特定、しない。検査code自体を改造できるclientに対する証明、しない。
 

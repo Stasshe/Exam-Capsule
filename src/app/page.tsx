@@ -104,14 +104,24 @@ async function playExitAlert(): Promise<void> {
 
   const oscillator = audioContext.createOscillator();
   const gain = audioContext.createGain();
-  oscillator.type = "square";
-  oscillator.frequency.setValueAtTime(880, audioContext.currentTime);
-  gain.gain.setValueAtTime(0.12, audioContext.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.6);
+  const startedAt = audioContext.currentTime;
+  const alertDuration = 4;
+  const sweepDuration = 0.5;
+  oscillator.type = "sawtooth";
+  oscillator.frequency.setValueAtTime(620, startedAt);
+  for (let offset = 0; offset < alertDuration; offset += sweepDuration * 2) {
+    oscillator.frequency.linearRampToValueAtTime(1080, startedAt + offset + sweepDuration);
+    oscillator.frequency.linearRampToValueAtTime(620, startedAt + offset + sweepDuration * 2);
+  }
+
+  gain.gain.setValueAtTime(0.0001, startedAt);
+  gain.gain.linearRampToValueAtTime(0.24, startedAt + 0.05);
+  gain.gain.setValueAtTime(0.24, startedAt + alertDuration - 0.08);
+  gain.gain.exponentialRampToValueAtTime(0.0001, startedAt + alertDuration);
   oscillator.connect(gain);
   gain.connect(audioContext.destination);
   oscillator.start();
-  oscillator.stop(audioContext.currentTime + 0.6);
+  oscillator.stop(startedAt + alertDuration);
 
   await new Promise<void>((resolve) => {
     oscillator.onended = () => resolve();

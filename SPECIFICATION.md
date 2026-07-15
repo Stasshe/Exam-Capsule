@@ -6,7 +6,9 @@
 
 ## 受験
 
-受験者、名前を入れる。開始時、serverがUUID session、bearer token、chain challengeを作る。client、Fullscreenを要求する。対応browserならKeyboard Lockも要求する。
+受験者、名前を入れる。通常画面、同一originの専用popupを開く。popup内の開始操作でserverがUUID session、bearer token、chain challengeを作る。client、Fullscreenを要求する。対応browserならKeyboard Lockも要求する。
+
+試験開始前、`outerWidth/outerHeight`と`innerWidth/innerHeight`の差からdockされたDeveloper Toolsを推定する。閾値を超える時、sessionを作らない。undockされたDeveloper Tools、改造browser、確実には検出できない。推定を環境完全性の証明に使わない。
 
 問題、serverが1問ずつ返す。3問、単一選択。回答順、serverが決める。現在問題でない回答、存在しない選択肢、二重提出、拒否する。最終回答で提出確定、server採点を返す。
 

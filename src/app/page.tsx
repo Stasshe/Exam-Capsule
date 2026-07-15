@@ -63,6 +63,13 @@ type KeyboardNavigator = Navigator & {
 };
 
 const sessionStorageKey = "exam-capsule-session";
+const launchCandidateKey = "exam-capsule-launch-candidate";
+
+function hasDockedDeveloperTools(): boolean {
+  const widthDifference = Math.max(0, window.outerWidth - window.innerWidth);
+  const heightDifference = Math.max(0, window.outerHeight - window.innerHeight);
+  return widthDifference > 200 || heightDifference > 250;
+}
 
 async function readError(response: Response): Promise<string> {
   const body: unknown = await response.json().catch(() => null);
@@ -149,6 +156,7 @@ export default function Home() {
   const [fullscreen, setFullscreen] = useState(false);
   const [keyboardLocked, setKeyboardLocked] = useState(false);
   const [report, setReport] = useState<ExamReport | null>(null);
+  const [capsuleWindow, setCapsuleWindow] = useState(false);
   const [now, setNow] = useState(() => new Date());
   const resizeTimer = useRef<number | null>(null);
   const intentionalFullscreenExit = useRef(false);
@@ -191,6 +199,19 @@ export default function Home() {
       throw new Error(await readError(response));
     }
     setReport((await response.json()) as ExamReport);
+  }, []);
+
+  useEffect(() => {
+    const parameters = new URLSearchParams(window.location.search);
+    if (parameters.get("capsule") !== "1") {
+      return;
+    }
+    setCapsuleWindow(true);
+    const launchCandidate = sessionStorage.getItem(launchCandidateKey);
+    if (launchCandidate) {
+      setCandidateName(launchCandidate);
+      sessionStorage.removeItem(launchCandidateKey);
+    }
   }, []);
 
   useEffect(() => {
@@ -388,6 +409,10 @@ export default function Home() {
       setError("受験者名を入力してください。");
       return;
     }
+    if (hasDockedDeveloperTools()) {
+      setError("開発者ツールを閉じてから試験を開始してください。");
+      return;
+    }
 
     setBusy(true);
     setError("");
@@ -480,8 +505,44 @@ export default function Home() {
     await startExam();
   }
 
+  function launchCapsuleWindow() {
+    if (!candidateName.trim()) {
+      setError("受験者名を入力してください。");
+      return;
+    }
+    if (hasDockedDeveloperTools()) {
+      setError("開発者ツールを閉じてから専用ウィンドウを開いてください。");
+      return;
+    }
+
+    const width = Math.min(1280, window.screen.availWidth);
+    const height = Math.min(900, window.screen.availHeight);
+    const left = Math.max(0, Math.round((window.screen.availWidth - width) / 2));
+    const top = Math.max(0, Math.round((window.screen.availHeight - height) / 2));
+    const features = `popup=yes,width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`;
+    const popup = window.open("about:blank", "_blank", features);
+    if (!popup) {
+      setError("専用ウィンドウを開けません。popupを許可してください。");
+      return;
+    }
+
+    try {
+      popup.sessionStorage.setItem(launchCandidateKey, candidateName.trim());
+      popup.opener = null;
+      popup.location.href = "/?capsule=1";
+      popup.focus();
+      setError("");
+    } catch {
+      popup.close();
+      setError("専用ウィンドウを初期化できませんでした。");
+    }
+  }
+
   if (!exam) {
-    let startButtonLabel = "試験を開始";
+    let startButtonLabel = "専用ウィンドウを開く";
+    if (capsuleWindow) {
+      startButtonLabel = "試験を開始";
+    }
     if (busy) {
       startButtonLabel = "試験環境を準備中…";
     }
@@ -524,13 +585,21 @@ export default function Home() {
               <button
                 className="mt-5 w-full bg-cyan-400 px-4 py-3 font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"
                 type="button"
-                onClick={() => void startExam()}
+                onClick={() => {
+                  if (capsuleWindow) {
+                    void startExam();
+                    return;
+                  }
+                  launchCapsuleWindow();
+                }}
                 disabled={busy}
               >
                 {startButtonLabel}
               </button>
               <p className="mt-4 text-xs leading-5 text-slate-500">
-                開始時にフルスクリーンを要求し、対応ブラウザではKeyboard Lockも使用します。
+                {capsuleWindow &&
+                  "開始時にフルスクリーンを要求し、対応ブラウザではKeyboard Lockも使用します。"}
+                {!capsuleWindow && "試験は通常の画面から分離した専用ウィンドウで実行します。"}
               </p>
               {error && (
                 <p className="mt-4 border-l-2 border-rose-400 pl-3 text-sm text-rose-300">

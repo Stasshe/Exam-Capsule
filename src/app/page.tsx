@@ -117,6 +117,27 @@ function parseStoredCredentials(): SessionCredentials | null {
   return null;
 }
 
+async function playExitAlert(): Promise<void> {
+  const audioContext = new AudioContext();
+  await audioContext.resume();
+
+  const oscillator = audioContext.createOscillator();
+  const gain = audioContext.createGain();
+  oscillator.type = "square";
+  oscillator.frequency.setValueAtTime(880, audioContext.currentTime);
+  gain.gain.setValueAtTime(0.12, audioContext.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.6);
+  oscillator.connect(gain);
+  gain.connect(audioContext.destination);
+  oscillator.start();
+  oscillator.stop(audioContext.currentTime + 0.6);
+
+  await new Promise<void>((resolve) => {
+    oscillator.onended = () => resolve();
+  });
+  await audioContext.close();
+}
+
 export default function Home() {
   const [candidateName, setCandidateName] = useState("");
   const [credentials, setCredentials] = useState<SessionCredentials | null>(null);
@@ -131,6 +152,7 @@ export default function Home() {
   const [now, setNow] = useState(() => new Date());
   const resizeTimer = useRef<number | null>(null);
   const intentionalFullscreenExit = useRef(false);
+  const lastSelectionEvidence = useRef(Number.NEGATIVE_INFINITY);
 
   const refreshPending = useCallback(async (sessionId: string) => {
     setPendingEvents(await countPending(sessionId));
@@ -241,6 +263,11 @@ export default function Home() {
         return;
       }
       void record("fullscreen.exit");
+      void playExitAlert().catch((audioError) => {
+        setError(
+          messageFromError(audioError, "フルスクリーン離脱の警告音を再生できませんでした。"),
+        );
+      });
     };
     const onBlur = () => void record("window.blur");
     const onFocus = () => void record("window.focus");
@@ -262,9 +289,17 @@ export default function Home() {
     };
     const blockSelection = (event: Event) => {
       event.preventDefault();
+      const now = performance.now();
+      if (now - lastSelectionEvidence.current < 5000) {
+        return;
+      }
+      lastSelectionEvidence.current = now;
       void record("selection.attempt");
     };
     const onKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat) {
+        return;
+      }
       let category = "character";
       if (event.ctrlKey || event.metaKey || event.altKey) {
         category = "shortcut";
@@ -277,7 +312,6 @@ export default function Home() {
         meta: event.metaKey,
         alt: event.altKey,
         shift: event.shiftKey,
-        repeat: event.repeat,
       });
     };
 
@@ -377,6 +411,9 @@ export default function Home() {
       };
       await initializeOutbox(body.id, body.challenge);
       sessionStorage.setItem(sessionStorageKey, JSON.stringify(nextCredentials));
+      setReport(null);
+      setSelectedOption("");
+      setPendingEvents(0);
       setCredentials(nextCredentials);
       setExam(body);
       await appendEvidence(body.id, "session.start", protectedMode);
@@ -439,10 +476,6 @@ export default function Home() {
   }
 
   async function retryExam() {
-    sessionStorage.removeItem(sessionStorageKey);
-    setReport(null);
-    setSelectedOption("");
-    setPendingEvents(0);
     setError("");
     await startExam();
   }

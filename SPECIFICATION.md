@@ -18,9 +18,11 @@ active session中、次を意味eventとして記録する。
 - Fullscreen出入り、document表示状態、window focus
 - viewport変更
 - clipboard copy/cut/paste試行、context menu、selection試行
-- raw keyを保存しないkeyboard分類とmodifier状態
+- raw keyを保存しないkeyboard分類とmodifier状態。長押しrepeatは追加記録しない
 
-clipboard、context menu、selection、通常UIで抑止する。透かし、受験者名、session断片、現在時刻を画面全体に置く。Fullscreen離脱、即表示する。
+clipboard、context menu、selection、通常UIで抑止する。selection抑止は毎回行うが、証跡は5秒に1件までに制限する。透かし、受験者名、session断片、現在時刻を画面全体に置く。Fullscreen離脱、即表示する。
+
+意図しないFullscreen離脱、約0.6秒の警告音を鳴らす。試験提出による自動離脱、鳴らさない。
 
 ## 証跡
 

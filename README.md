@@ -19,8 +19,8 @@ pnpm dev
 
 ## 実装範囲
 
-- FullscreenとKeyboard Lockの要求、離脱状態の表示
-- `visibilitychange`、focus、resize、キー種別、選択、クリップボード、context menuの記録
+- FullscreenとKeyboard Lockの要求、離脱状態と警告音
+- `visibilitychange`、focus、resize、キー種別、選択、クリップボード、context menuの記録。キー長押しrepeatは除外し、選択試行は5秒単位で抑制
 - 受験者、session、時刻を含む動的透かし
 - IndexedDBへ先に保存するevent outbox
 - SHA-256 hash chain、連番検証、ACK後のローカル削除

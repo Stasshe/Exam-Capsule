@@ -25,6 +25,7 @@ pnpm dev
 - IndexedDBへ先に保存するevent outbox
 - SHA-256 hash chain、連番検証、ACK後のローカル削除
 - tokenでbindしたsession、サーバー基準の問題進行と採点
+- 提出後の不審度概算とサーバー受理データレポート
 - 2秒pollingの証跡確認画面
 
 ## デモ制約

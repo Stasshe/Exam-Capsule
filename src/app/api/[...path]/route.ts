@@ -23,12 +23,12 @@ type RouteContext = {
 async function startSession(request: NextRequest): Promise<Response> {
   const body: unknown = await request.json().catch(() => null);
   if (!isObject(body) || typeof body.candidateName !== "string") {
-    return errorResponse("Candidate name is required.", 400);
+    return errorResponse("受験者名を入力してください。", 400);
   }
 
   const candidateName = body.candidateName.trim();
   if (candidateName.length < 1 || candidateName.length > 80) {
-    return errorResponse("Candidate name must be between 1 and 80 characters.", 400);
+    return errorResponse("受験者名は1〜80文字で入力してください。", 400);
   }
 
   return Response.json(createSession(candidateName), { status: 201 });
@@ -37,7 +37,7 @@ async function startSession(request: NextRequest): Promise<Response> {
 function readExam(request: NextRequest): Response {
   const session = getAuthenticatedSession(request);
   if (!session) {
-    return errorResponse("The exam session is not available.", 401);
+    return errorResponse("試験セッションを利用できません。", 401);
   }
   return Response.json(getSessionState(session));
 }
@@ -45,10 +45,10 @@ function readExam(request: NextRequest): Response {
 function readReport(request: NextRequest): Response {
   const session = getAuthenticatedSession(request);
   if (!session) {
-    return errorResponse("The exam session is not available.", 401);
+    return errorResponse("試験セッションを利用できません。", 401);
   }
   if (session.status !== "submitted") {
-    return errorResponse("The report is available after submission.", 409);
+    return errorResponse("レポートは提出後に確認できます。", 409);
   }
   return Response.json(getSessionReport(session));
 }
@@ -56,44 +56,44 @@ function readReport(request: NextRequest): Response {
 async function saveAnswer(request: NextRequest): Promise<Response> {
   const session = getAuthenticatedSession(request);
   if (!session) {
-    return errorResponse("The exam session is not available.", 401);
+    return errorResponse("試験セッションを利用できません。", 401);
   }
 
   const body: unknown = await request.json().catch(() => null);
   if (!isObject(body) || typeof body.questionId !== "string" || typeof body.optionId !== "string") {
-    return errorResponse("Question and option are required.", 400);
+    return errorResponse("問題と回答を指定してください。", 400);
   }
 
   try {
     return Response.json(answerQuestion(session, body.questionId, body.optionId));
   } catch (error) {
-    return errorResponse(messageFromError(error, "The answer could not be saved."), 409);
+    return errorResponse(messageFromError(error, "回答を保存できませんでした。"), 409);
   }
 }
 
 async function saveEvents(request: NextRequest): Promise<Response> {
   const session = getAuthenticatedSession(request);
   if (!session) {
-    return errorResponse("The exam session is not available.", 401);
+    return errorResponse("試験セッションを利用できません。", 401);
   }
 
   const body: unknown = await request.json().catch(() => null);
   if (!isObject(body) || !Array.isArray(body.events) || body.events.length > 100) {
-    return errorResponse("An event batch of at most 100 items is required.", 400);
+    return errorResponse("イベントは100件以内の配列で送信してください。", 400);
   }
   if (!body.events.every(isEvidenceEvent)) {
-    return errorResponse("The event batch is invalid.", 400);
+    return errorResponse("イベントデータが不正です。", 400);
   }
 
   const events: EvidenceEvent[] = body.events;
   if (events.some((event) => event.sessionId !== session.id)) {
-    return errorResponse("The event session does not match the authenticated session.", 400);
+    return errorResponse("イベントと認証セッションが一致しません。", 400);
   }
 
   try {
     return Response.json({ acceptedThrough: appendEvents(session, events) });
   } catch (error) {
-    return errorResponse(messageFromError(error, "The event batch was rejected."), 409);
+    return errorResponse(messageFromError(error, "イベントを受理できませんでした。"), 409);
   }
 }
 
@@ -106,10 +106,10 @@ function reviewSessions(request: NextRequest): Response {
 
   const authentication = authenticateReviewer(reviewerKey);
   if (authentication === "unavailable") {
-    return errorResponse("REVIEWER_KEY is not configured on the server.", 503);
+    return errorResponse("サーバーにREVIEWER_KEYが設定されていません。", 503);
   }
   if (authentication === "rejected") {
-    return errorResponse("The reviewer key is invalid.", 401);
+    return errorResponse("確認キーが正しくありません。", 401);
   }
   return Response.json({ sessions: getReviewSessions() });
 }
@@ -125,13 +125,13 @@ export async function GET(request: NextRequest, context: RouteContext): Promise<
   if (path.length === 1 && path[0] === "report") {
     return readReport(request);
   }
-  return errorResponse("API endpoint not found.", 404);
+  return errorResponse("API endpointが見つかりません。", 404);
 }
 
 export async function POST(request: NextRequest, context: RouteContext): Promise<Response> {
   const { path } = await context.params;
   if (path.length !== 1) {
-    return errorResponse("API endpoint not found.", 404);
+    return errorResponse("API endpointが見つかりません。", 404);
   }
   if (path[0] === "sessions") {
     return startSession(request);
@@ -142,5 +142,5 @@ export async function POST(request: NextRequest, context: RouteContext): Promise
   if (path[0] === "events") {
     return saveEvents(request);
   }
-  return errorResponse("API endpoint not found.", 404);
+  return errorResponse("API endpointが見つかりません。", 404);
 }

@@ -24,7 +24,8 @@ let appendTail: Promise<void> = Promise.resolve();
 function requestResult<T>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
     request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error ?? new Error("IndexedDB request failed."));
+    request.onerror = () =>
+      reject(request.error ?? new Error("端末内の証跡を読み書きできません。"));
   });
 }
 
@@ -32,9 +33,9 @@ function transactionDone(transaction: IDBTransaction): Promise<void> {
   return new Promise((resolve, reject) => {
     transaction.oncomplete = () => resolve();
     transaction.onerror = () =>
-      reject(transaction.error ?? new Error("IndexedDB transaction failed."));
+      reject(transaction.error ?? new Error("端末内の証跡保存に失敗しました。"));
     transaction.onabort = () =>
-      reject(transaction.error ?? new Error("IndexedDB transaction aborted."));
+      reject(transaction.error ?? new Error("端末内の証跡保存が中断されました。"));
   });
 }
 
@@ -54,7 +55,7 @@ function openDatabase(): Promise<IDBDatabase> {
       }
     };
     request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error ?? new Error("IndexedDB could not be opened."));
+    request.onerror = () => reject(request.error ?? new Error("端末内の証跡領域を開けません。"));
   });
 }
 
@@ -94,7 +95,7 @@ async function appendInternal(
   try {
     const chain = await getChain(database, sessionId);
     if (!chain) {
-      throw new Error("The local evidence chain is not initialized.");
+      throw new Error("端末内の証跡チェーンが初期化されていません。");
     }
 
     const unsignedEvent: UnsignedEvidenceEvent = {
@@ -179,12 +180,12 @@ export async function flushEvidence(credentials: SessionCredentials): Promise<nu
     });
     const body: unknown = await response.json().catch(() => null);
     if (!response.ok || typeof body !== "object" || body === null || !("acceptedThrough" in body)) {
-      throw new Error("The evidence server rejected the pending event batch.");
+      throw new Error("サーバーが未送信の証跡を拒否しました。");
     }
 
     const acceptedThrough = Reflect.get(body, "acceptedThrough");
     if (typeof acceptedThrough !== "number") {
-      throw new Error("The evidence server returned an invalid acknowledgement.");
+      throw new Error("サーバーの証跡受理応答が不正です。");
     }
     await removeAccepted(database, events, acceptedThrough);
     return events.filter((event) => event.sequence > acceptedThrough).length;

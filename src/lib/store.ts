@@ -111,15 +111,15 @@ export function getSessionState(session: ExamSession) {
 
 export function answerQuestion(session: ExamSession, questionId: string, optionId: string) {
   if (session.status !== "active") {
-    throw new Error("This exam has already been submitted.");
+    throw new Error("この試験は提出済みです。");
   }
 
   const currentQuestion = getQuestion(session.answers.length);
   if (!currentQuestion || currentQuestion.id !== questionId) {
-    throw new Error("The question is not the current question.");
+    throw new Error("現在の問題ではありません。");
   }
   if (!currentQuestion.options.some((option) => option.id === optionId)) {
-    throw new Error("The selected option does not exist.");
+    throw new Error("選択肢が存在しません。");
   }
 
   session.answers.push({

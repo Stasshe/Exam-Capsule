@@ -2,9 +2,8 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-
-import type { EvidenceEvent, JsonValue } from "@/lib/evidence";
 import { messageFromError } from "@/lib/errors";
+import type { EvidenceEvent, JsonValue } from "@/lib/evidence";
 
 type ReviewEvent = EvidenceEvent & {
   receivedAt: string;
@@ -46,6 +45,13 @@ function sessionStatusClass(status: ReviewSession["status"]): string {
   return "text-emerald-400";
 }
 
+function sessionStatusLabel(status: ReviewSession["status"]): string {
+  if (status === "active") {
+    return "受験中";
+  }
+  return "提出済み";
+}
+
 async function readError(response: Response): Promise<string> {
   const body: unknown = await response.json().catch(() => null);
   if (typeof body === "object" && body !== null && "error" in body) {
@@ -54,7 +60,7 @@ async function readError(response: Response): Promise<string> {
       return message;
     }
   }
-  return `Request failed with status ${response.status}.`;
+  return `通信に失敗しました（status ${response.status}）。`;
 }
 
 export default function ReviewPage() {
@@ -85,7 +91,7 @@ export default function ReviewPage() {
       }
     } catch (refreshError) {
       setConnected(false);
-      setError(messageFromError(refreshError, "Evidence refresh failed."));
+      setError(messageFromError(refreshError, "証跡を更新できませんでした。"));
     }
   }, [reviewerKey, selectedId]);
 
@@ -99,7 +105,7 @@ export default function ReviewPage() {
 
   const selected = sessions.find((session) => session.id === selectedId) ?? null;
   let selectedPanel = (
-    <p className="text-sm text-slate-500">No session is available in this server instance.</p>
+    <p className="text-sm text-slate-500">このサーバーインスタンスにセッションはありません。</p>
   );
   if (selected) {
     selectedPanel = (
@@ -110,8 +116,8 @@ export default function ReviewPage() {
             <h2 className="mt-2 text-2xl font-semibold">{selected.candidateName}</h2>
           </div>
           <div className="text-right text-xs text-slate-400">
-            <p>{selected.answers.length} answers</p>
-            <p className="mt-1">{selected.events.length} accepted events</p>
+            <p>回答 {selected.answers.length}件</p>
+            <p className="mt-1">受理イベント {selected.events.length}件</p>
           </div>
         </div>
 
@@ -120,10 +126,10 @@ export default function ReviewPage() {
             <thead className="bg-slate-900 font-mono text-xs text-slate-400">
               <tr>
                 <th className="px-4 py-3">SEQ</th>
-                <th className="px-4 py-3">SERVER TIME</th>
-                <th className="px-4 py-3">EVENT</th>
-                <th className="px-4 py-3">PAYLOAD</th>
-                <th className="px-4 py-3">HASH</th>
+                <th className="px-4 py-3">受理時刻</th>
+                <th className="px-4 py-3">イベント</th>
+                <th className="px-4 py-3">データ</th>
+                <th className="px-4 py-3">ハッシュ</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800">
@@ -146,7 +152,7 @@ export default function ReviewPage() {
           </table>
           {selected.events.length === 0 && (
             <p className="px-4 py-12 text-center text-sm text-slate-500">
-              No evidence has been accepted yet.
+              受理済みの証跡はありません。
             </p>
           )}
         </div>
@@ -159,17 +165,17 @@ export default function ReviewPage() {
       <header className="flex items-center justify-between border-b border-slate-800 px-6 py-4">
         <div>
           <p className="font-mono text-xs tracking-[0.2em] text-cyan-400">EXAM CAPSULE</p>
-          <h1 className="mt-1 text-lg font-semibold">Evidence review</h1>
+          <h1 className="mt-1 text-lg font-semibold">証跡確認</h1>
         </div>
         <Link className="text-sm text-slate-400 hover:text-white" href="/">
-          Candidate view
+          受験画面
         </Link>
       </header>
 
       {!connected && (
         <section className="mx-auto max-w-md px-6 py-24">
           <label className="text-sm text-slate-300" htmlFor="reviewer-key">
-            Reviewer key
+            確認キー
           </label>
           <input
             id="reviewer-key"
@@ -184,7 +190,7 @@ export default function ReviewPage() {
             disabled={!reviewerKey}
             onClick={() => void refresh()}
           >
-            Open ledger
+            証跡を開く
           </button>
           {error && <p className="mt-4 text-sm text-rose-300">{error}</p>}
         </section>
@@ -194,8 +200,8 @@ export default function ReviewPage() {
         <div className="grid min-h-[calc(100vh-73px)] lg:grid-cols-[320px_1fr]">
           <aside className="border-r border-slate-800 bg-slate-900/60">
             <div className="border-b border-slate-800 px-5 py-4">
-              <p className="text-xs text-slate-500">AUTO REFRESH · 2 SEC</p>
-              <p className="mt-1 text-sm">{sessions.length} sessions in this server instance</p>
+              <p className="text-xs text-slate-500">2秒ごとに自動更新</p>
+              <p className="mt-1 text-sm">このインスタンスに {sessions.length} セッション</p>
             </div>
             <div>
               {sessions.map((session) => (
@@ -208,7 +214,7 @@ export default function ReviewPage() {
                   <span className="flex items-center justify-between gap-3">
                     <strong className="truncate text-sm">{session.candidateName}</strong>
                     <span className={sessionStatusClass(session.status)}>
-                      {session.status.toUpperCase()}
+                      {sessionStatusLabel(session.status)}
                     </span>
                   </span>
                   <span className="mt-2 block font-mono text-xs text-slate-500">

@@ -2,9 +2,8 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-
-import type { JsonObject } from "@/lib/evidence";
 import { messageFromError } from "@/lib/errors";
+import type { EvidenceEvent, JsonObject } from "@/lib/evidence";
 import { appendEvidence, countPending, flushEvidence, initializeOutbox } from "@/lib/outbox";
 import type { Question } from "@/lib/questions";
 
@@ -44,8 +43,15 @@ type ExamReport = {
     answerCount: number;
     eventCount: number;
     acceptedThrough: number;
-    answers: JsonObject[];
-    events: JsonObject[];
+    answers: Array<{
+      questionId: string;
+      prompt: string;
+      optionId: string;
+      selectedLabel: string;
+      answeredAt: string;
+      correct: boolean;
+    }>;
+    events: Array<EvidenceEvent & { receivedAt: string }>;
   };
 };
 
@@ -65,7 +71,7 @@ async function readError(response: Response): Promise<string> {
       return message;
     }
   }
-  return `Request failed with status ${response.status}.`;
+  return `通信に失敗しました（status ${response.status}）。`;
 }
 
 function sessionHeaders(credentials: SessionCredentials): HeadersInit {
@@ -137,7 +143,7 @@ export default function Home() {
         await appendEvidence(credentials.sessionId, type, payload);
         await refreshPending(credentials.sessionId);
       } catch (recordError) {
-        setError(messageFromError(recordError, "Evidence recording failed."));
+        setError(messageFromError(recordError, "操作証跡を保存できませんでした。"));
       }
     },
     [credentials, refreshPending],
@@ -151,7 +157,7 @@ export default function Home() {
       await flushEvidence(credentials);
       await refreshPending(credentials.sessionId);
     } catch (flushError) {
-      setError(messageFromError(flushError, "Evidence delivery failed."));
+      setError(messageFromError(flushError, "操作証跡を送信できませんでした。"));
     }
   }, [credentials, refreshPending]);
 
@@ -187,7 +193,7 @@ export default function Home() {
         }
       } catch (restoreError) {
         sessionStorage.removeItem(sessionStorageKey);
-        setError(messageFromError(restoreError, "Session restoration failed."));
+        setError(messageFromError(restoreError, "セッションを復元できませんでした。"));
       } finally {
         setBusy(false);
       }
@@ -307,7 +313,7 @@ export default function Home() {
       enteredFullscreen = true;
       setFullscreen(true);
     } catch {
-      setError("Fullscreen was denied. The attempt will be recorded after the session starts.");
+      setError("フルスクリーンが拒否されました。開始後の状態を記録します。");
     }
 
     const keyboard = (navigator as KeyboardNavigator).keyboard;
@@ -317,7 +323,7 @@ export default function Home() {
         lockedKeyboard = true;
         setKeyboardLocked(true);
       } catch {
-        setError("Keyboard Lock is unavailable. Fullscreen monitoring remains active.");
+        setError("Keyboard Lockを利用できません。フルスクリーン監視は継続します。");
       }
     }
     return { fullscreen: enteredFullscreen, keyboard: lockedKeyboard };
@@ -325,7 +331,7 @@ export default function Home() {
 
   async function startExam() {
     if (!candidateName.trim()) {
-      setError("Enter a candidate name.");
+      setError("受験者名を入力してください。");
       return;
     }
 
@@ -360,7 +366,7 @@ export default function Home() {
       if (document.fullscreenElement) {
         await document.exitFullscreen();
       }
-      setError(messageFromError(startError, "The exam could not be started."));
+      setError(messageFromError(startError, "試験を開始できませんでした。"));
     } finally {
       setBusy(false);
     }
@@ -368,7 +374,7 @@ export default function Home() {
 
   async function submitAnswer() {
     if (!credentials || !exam?.question || !selectedOption) {
-      setError("Select an answer before continuing.");
+      setError("回答を選択してください。");
       return;
     }
 
@@ -400,7 +406,7 @@ export default function Home() {
         await loadReport(credentials);
       }
     } catch (submitError) {
-      setError(messageFromError(submitError, "The answer could not be submitted."));
+      setError(messageFromError(submitError, "回答を送信できませんでした。"));
     } finally {
       setBusy(false);
     }
@@ -432,7 +438,7 @@ export default function Home() {
           <section className="grid flex-1 items-center gap-12 py-16 lg:grid-cols-[1.2fr_0.8fr]">
             <div>
               <p className="max-w-xl text-4xl font-semibold leading-tight tracking-tight sm:text-6xl">
-                受験中の操作を、検証できる証跡に。
+                できるだけ不正をしてみろ（パソコン１台の使用のみとする）
               </p>
               <p className="mt-6 max-w-2xl text-base leading-7 text-slate-400">
                 フォーカス、フルスクリーン、キー種別、クリップボード操作、回答進行を監視します。
@@ -511,12 +517,16 @@ export default function Home() {
     <div className="w-full max-w-2xl border-t-4 border-emerald-600 bg-white p-10 shadow-sm">
       <p className="font-mono text-xs tracking-widest text-emerald-700">提出確定</p>
       <h2 className="mt-4 text-4xl font-semibold">試験レポート</h2>
-      <p className="mt-4 text-slate-600">得点: {exam.score} / {exam.questionCount}</p>
+      <p className="mt-4 text-slate-600">
+        得点: {exam.score} / {exam.questionCount}
+      </p>
       {!report && <p className="mt-8 text-sm text-slate-500">サーバー受理データを集計中…</p>}
       {report && (
         <div className="mt-8 space-y-6">
           <section className="border border-slate-300 bg-slate-50 p-5">
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">不審度の概算</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              不審度の概算
+            </p>
             <div className="mt-2 flex items-end gap-3">
               <strong className="font-mono text-5xl">{report.risk.score}</strong>
               <span className="pb-1 text-sm text-slate-500">/ 100 · {riskLevel}</span>
@@ -526,18 +536,33 @@ export default function Home() {
             </p>
           </section>
           <dl className="grid grid-cols-2 gap-px bg-slate-300 text-sm sm:grid-cols-4">
-            <div className="bg-white p-3"><dt className="text-xs text-slate-500">全画面離脱</dt><dd className="mt-1 font-mono">{report.risk.signals.fullscreenExits}</dd></div>
-            <div className="bg-white p-3"><dt className="text-xs text-slate-500">非表示</dt><dd className="mt-1 font-mono">{report.risk.signals.hiddenEvents}</dd></div>
-            <div className="bg-white p-3"><dt className="text-xs text-slate-500">Clipboard試行</dt><dd className="mt-1 font-mono">{report.risk.signals.clipboardAttempts}</dd></div>
-            <div className="bg-white p-3"><dt className="text-xs text-slate-500">Focus離脱</dt><dd className="mt-1 font-mono">{report.risk.signals.focusLosses}</dd></div>
+            <div className="bg-white p-3">
+              <dt className="text-xs text-slate-500">全画面離脱</dt>
+              <dd className="mt-1 font-mono">{report.risk.signals.fullscreenExits}</dd>
+            </div>
+            <div className="bg-white p-3">
+              <dt className="text-xs text-slate-500">非表示</dt>
+              <dd className="mt-1 font-mono">{report.risk.signals.hiddenEvents}</dd>
+            </div>
+            <div className="bg-white p-3">
+              <dt className="text-xs text-slate-500">Clipboard試行</dt>
+              <dd className="mt-1 font-mono">{report.risk.signals.clipboardAttempts}</dd>
+            </div>
+            <div className="bg-white p-3">
+              <dt className="text-xs text-slate-500">Focus離脱</dt>
+              <dd className="mt-1 font-mono">{report.risk.signals.focusLosses}</dd>
+            </div>
           </dl>
           <section>
             <h3 className="font-semibold">サーバーが受理したデータ</h3>
             <p className="mt-2 text-sm text-slate-600">
-              回答 {report.received.answerCount}件 · イベント {report.received.eventCount}件 · 最終連番 {report.received.acceptedThrough}
+              回答 {report.received.answerCount}件 · イベント {report.received.eventCount}件 ·
+              最終連番 {report.received.acceptedThrough}
             </p>
             <details className="mt-3 border border-slate-300">
-              <summary className="cursor-pointer px-4 py-3 text-sm font-medium">受理データの全文を表示</summary>
+              <summary className="cursor-pointer px-4 py-3 text-sm font-medium">
+                受理データの全文を表示
+              </summary>
               <pre className="max-h-80 overflow-auto border-t border-slate-300 bg-slate-950 p-4 text-xs text-slate-100">
                 {JSON.stringify(report.received, null, 2)}
               </pre>

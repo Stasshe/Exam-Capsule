@@ -23,6 +23,7 @@ Chromium系ブラウザで受験URLを開き、インストールボタンを押
 
 - FullscreenとKeyboard Lockの要求、離脱状態と警告音
 - install可能なPWA、standalone app window、browser tabからの受験拒否
+- 1〜80文字の日本語名・ASCII英字による受験者名検証
 - 全画面での右クリック・既知のDeveloper Toolsショートカット抑止と、dockされたDeveloper Toolsの操作遮断
 - 問題文・選択肢の改変、非表示、被覆検出と回答停止
 - CSPと不要browser capabilityの拒否

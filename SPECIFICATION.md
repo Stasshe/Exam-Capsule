@@ -6,7 +6,7 @@
 
 ## 受験
 
-通常browser、PWA install導線と証跡確認だけ出す。受験開始、拒否する。manifestでPWA自身をrelated applicationとして宣言し、対応Chromiumでは既存installを検出する。install buttonの操作中にService WorkerとChromiumのinstall promptを待ち、準備後は同じ操作の流れでnative確認を直接開く。browserの安全確認は自動承認できない。install済みPWAをOS iconから起動するとstandalone app windowになる。そこで受験者名を入れる。
+通常browser、PWA install導線と証跡確認だけ出す。受験開始、拒否する。manifestでPWA自身をrelated applicationとして宣言し、対応Chromiumでは既存installを検出する。install buttonの操作中にService WorkerとChromiumのinstall promptを待ち、準備後は同じ操作の流れでnative確認を直接開く。browserの安全確認は自動承認できない。install済みPWAをOS iconから起動するとstandalone app windowになる。そこで受験者名を入れる。受験者名、1〜80文字。漢字、ひらがな、カタカナ、ASCII英字、半角space、hyphen、apostropheだけを許可し、記号だけの名前、その他のUnicode文字を拒否する。clientとserverで同じ規則を検査する。
 
 開始操作でserverがUUID session、bearer token、chain challengeを作る。client、Fullscreenを要求する。対応browserならKeyboard Lockも要求する。Fullscreen APIはuser activationが要るため自動実行しない。manifest、`display: standalone`を使う。試験終了時、Fullscreenを解除できる状態を保つ。
 

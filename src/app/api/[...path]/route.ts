@@ -12,7 +12,7 @@ import {
   getSessionReport,
   getSessionState,
 } from "@/lib/store";
-import { isEvidenceEvent, isObject } from "@/lib/validation";
+import { candidateNameError, isEvidenceEvent, isObject } from "@/lib/validation";
 
 export const runtime = "nodejs";
 
@@ -27,8 +27,9 @@ async function startSession(request: NextRequest): Promise<Response> {
   }
 
   const candidateName = body.candidateName.trim();
-  if (candidateName.length < 1 || candidateName.length > 80) {
-    return errorResponse("受験者名は1〜80文字で入力してください。", 400);
+  const validationError = candidateNameError(candidateName);
+  if (validationError) {
+    return errorResponse(validationError, 400);
   }
 
   return Response.json(createSession(candidateName), { status: 201 });

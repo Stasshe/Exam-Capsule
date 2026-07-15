@@ -1,5 +1,22 @@
 import type { EvidenceEvent, JsonObject, JsonValue } from "@/lib/evidence";
 
+const candidateNamePattern = /^[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}A-Za-z '\-ー]+$/u;
+const candidateNameLetterPattern = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}A-Za-z]/u;
+
+export function candidateNameError(value: string): string | null {
+  const candidateName = value.trim();
+  if (!candidateName) {
+    return "受験者名を入力してください。";
+  }
+  if ([...candidateName].length > 80) {
+    return "受験者名は1〜80文字で入力してください。";
+  }
+  if (!candidateNamePattern.test(candidateName) || !candidateNameLetterPattern.test(candidateName)) {
+    return "受験者名には日本語、英字、半角スペース、ハイフン、アポストロフィだけを使用してください。";
+  }
+  return null;
+}
+
 export function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }

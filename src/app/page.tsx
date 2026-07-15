@@ -17,6 +17,7 @@ import type { IntegrityFailure } from "@/lib/integrity";
 import { keyboardPayload, keyIdentifier, type PressedKey } from "@/lib/keyboard";
 import { appendEvidence, countPending, flushEvidence, initializeOutbox } from "@/lib/outbox";
 import type { Question } from "@/lib/questions";
+import { candidateNameError } from "@/lib/validation";
 
 type ExamState = {
   id: string;
@@ -485,8 +486,9 @@ export default function Home() {
       setError("インストール済みのExam Capsuleから起動してください。");
       return;
     }
-    if (!candidateName.trim()) {
-      setError("受験者名を入力してください。");
+    const validationError = candidateNameError(candidateName);
+    if (validationError) {
+      setError(validationError);
       return;
     }
     if (hasDockedDeveloperTools()) {

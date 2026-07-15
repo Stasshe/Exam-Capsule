@@ -17,13 +17,13 @@ pnpm dev
 
 証跡確認では `.env.local` の `REVIEWER_KEY` を入力する。
 
-ブラウザで受験URLを開き、表示されるインストール操作を行う。インストール後はOSのアプリアイコンから起動する。通常browser tabでは試験を開始できない。VercelではHTTPSが自動提供される。
+Chromium系ブラウザで受験URLを開き、インストールボタンを押す。準備が必要な間だけボタン表示が変わり、準備後は同じ操作の流れでnative確認を開く。既に導入済みなら再インストールを待たず、その状態を表示する。ブラウザの確認を承認し、OSのアプリアイコンから起動する。通常browser tabでは試験を開始できない。VercelではHTTPSが自動提供される。
 
 ## 実装範囲
 
 - FullscreenとKeyboard Lockの要求、離脱状態と警告音
 - install可能なPWA、standalone app window、browser tabからの受験拒否
-- dockされたDeveloper Toolsの開始前検査
+- 全画面での右クリック・既知のDeveloper Toolsショートカット抑止と、dockされたDeveloper Toolsの操作遮断
 - 問題文・選択肢の改変、非表示、被覆検出と回答停止
 - CSPと不要browser capabilityの拒否
 - `visibilitychange`、focus、resize、keydown/keyupと同時押し、選択、クリップボード、context menuの記録。キー長押しrepeatは1回の押下へ集約し、選択試行は5秒単位で抑制
@@ -41,6 +41,6 @@ pnpm dev
 
 通常ブラウザ上のJavaScriptは改造可能であり、このデモは不正不可能性を証明しない。検出と通常クライアントにおける証跡欠落の低減を扱う。
 
-Service Workerによるoffline受験は提供しない。問題進行、回答確定、証跡受理にはserver接続が必要。
+Service Workerはインストール判定のために通信をそのままnetworkへ渡す。cacheとoffline受験は提供しない。問題進行、回答確定、証跡受理にはserver接続が必要。
 
 詳細は [SPECIFICATION.md](SPECIFICATION.md) と [EVIDENCE_INTENT.md](EVIDENCE_INTENT.md) を参照。

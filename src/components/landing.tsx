@@ -4,8 +4,8 @@ type LandingProps = {
   candidateName: string;
   error: string;
   busy: boolean;
+  alreadyInstalled: boolean;
   installMode: "checking" | "browser" | "installed";
-  installAvailable: boolean;
   installMessage: string;
   onCandidateNameChange(value: string): void;
   onInstall(): void;
@@ -16,8 +16,8 @@ export function Landing({
   candidateName,
   error,
   busy,
+  alreadyInstalled,
   installMode,
-  installAvailable,
   installMessage,
   onCandidateNameChange,
   onInstall,
@@ -27,9 +27,12 @@ export function Landing({
   if (busy) {
     startButtonLabel = "試験環境を準備中…";
   }
-  let installButtonLabel = "インストール方法を表示";
-  if (installAvailable) {
-    installButtonLabel = "Exam Capsuleをインストール";
+  let installButtonLabel = "Exam Capsuleをインストール";
+  if (busy) {
+    installButtonLabel = "インストールを準備中…";
+  }
+  if (alreadyInstalled) {
+    installButtonLabel = "インストール済み";
   }
 
   let actionPanel = (
@@ -50,7 +53,7 @@ export function Landing({
           className="mt-6 w-full bg-cyan-400 px-4 py-3 font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"
           type="button"
           onClick={onInstall}
-          disabled={busy}
+          disabled={busy || alreadyInstalled}
         >
           {installButtonLabel}
         </button>

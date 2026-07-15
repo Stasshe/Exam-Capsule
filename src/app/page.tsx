@@ -4,9 +4,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Landing } from "@/components/landing";
 import { type ExamReport, Report } from "@/components/report";
 import { useIntegrity } from "@/hooks/useIntegrity";
+import { hasDockedDeveloperTools } from "@/lib/devtools";
 import { messageFromError } from "@/lib/errors";
 import type { JsonObject } from "@/lib/evidence";
-import { type InstallPromptEvent, isInstalledDisplayMode } from "@/lib/install";
+import {
+  type InstallPromptEvent,
+  isAppInstalled,
+  isInstalledDisplayMode,
+  registerInstallWorker,
+} from "@/lib/install";
 import type { IntegrityFailure } from "@/lib/integrity";
 import { keyboardPayload, keyIdentifier, type PressedKey } from "@/lib/keyboard";
 import { appendEvidence, countPending, flushEvidence, initializeOutbox } from "@/lib/outbox";
@@ -38,12 +44,6 @@ type KeyboardNavigator = Navigator & {
 };
 
 const sessionStorageKey = "exam-capsule-session";
-
-function hasDockedDeveloperTools(): boolean {
-  const widthDifference = Math.max(0, window.outerWidth - window.innerWidth);
-  const heightDifference = Math.max(0, window.outerHeight - window.innerHeight);
-  return widthDifference > 200 || heightDifference > 250;
-}
 
 async function readError(response: Response): Promise<string> {
   const body: unknown = await response.json().catch(() => null);
@@ -141,12 +141,14 @@ export default function Home() {
   const [keyboardLocked, setKeyboardLocked] = useState(false);
   const [report, setReport] = useState<ExamReport | null>(null);
   const [installMode, setInstallMode] = useState<"checking" | "browser" | "installed">("checking");
-  const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
   const [installMessage, setInstallMessage] = useState("");
+  const [alreadyInstalled, setAlreadyInstalled] = useState(false);
   const [now, setNow] = useState(() => new Date());
   const resizeTimer = useRef<number | null>(null);
   const intentionalFullscreenExit = useRef(false);
   const lastSelectionEvidence = useRef(Number.NEGATIVE_INFINITY);
+  const installPrompt = useRef<InstallPromptEvent | null>(null);
+  const installWaiter = useRef<((event: InstallPromptEvent) => void) | null>(null);
 
   const refreshPending = useCallback(async (sessionId: string) => {
     setPendingEvents(await countPending(sessionId));
@@ -214,10 +216,16 @@ export default function Home() {
     };
     const captureInstallPrompt = (event: Event) => {
       event.preventDefault();
-      setInstallPrompt(event as InstallPromptEvent);
+      const promptEvent = event as InstallPromptEvent;
+      installPrompt.current = promptEvent;
+      if (installWaiter.current) {
+        installWaiter.current(promptEvent);
+        installWaiter.current = null;
+      }
     };
     const markInstalled = () => {
-      setInstallPrompt(null);
+      installPrompt.current = null;
+      setAlreadyInstalled(true);
       setInstallMessage("インストールが完了しました。OSのアプリアイコンから起動してください。");
     };
 
@@ -228,6 +236,16 @@ export default function Home() {
     fullscreenQuery.addEventListener("change", updateMode);
     window.addEventListener("beforeinstallprompt", captureInstallPrompt);
     window.addEventListener("appinstalled", markInstalled);
+    void registerInstallWorker()
+      .then(async () => {
+        if (await isAppInstalled()) {
+          setAlreadyInstalled(true);
+          setInstallMessage("インストール済みです。OSのアプリアイコンから起動してください。");
+        }
+      })
+      .catch((installError) => {
+        setInstallMessage(messageFromError(installError, "インストールの準備に失敗しました。"));
+      });
 
     return () => {
       standaloneQuery.removeEventListener("change", updateMode);
@@ -568,18 +586,31 @@ export default function Home() {
   }
 
   async function installApp() {
-    if (!installPrompt) {
-      setInstallMessage(
-        "ブラウザメニューの「アプリをインストール」または「ホーム画面に追加」を使用してください。",
-      );
-      return;
-    }
     setBusy(true);
     setInstallMessage("");
     try {
-      await installPrompt.prompt();
-      const choice = await installPrompt.userChoice;
-      setInstallPrompt(null);
+      if (await isAppInstalled()) {
+        setAlreadyInstalled(true);
+        setInstallMessage("インストール済みです。OSのアプリアイコンから起動してください。");
+        return;
+      }
+      await registerInstallWorker();
+      let promptEvent = installPrompt.current;
+      if (!promptEvent) {
+        promptEvent = await new Promise<InstallPromptEvent>((resolve, reject) => {
+          const timeout = window.setTimeout(() => {
+            installWaiter.current = null;
+            reject(new Error("ブラウザがインストール画面を準備できませんでした。"));
+          }, 5000);
+          installWaiter.current = (event) => {
+            window.clearTimeout(timeout);
+            resolve(event);
+          };
+        });
+      }
+      await promptEvent.prompt();
+      const choice = await promptEvent.userChoice;
+      installPrompt.current = null;
       if (choice.outcome === "accepted") {
         setInstallMessage("インストール後、OSのアプリアイコンからExam Capsuleを起動してください。");
         return;
@@ -598,8 +629,8 @@ export default function Home() {
         candidateName={candidateName}
         error={error}
         busy={busy}
+        alreadyInstalled={alreadyInstalled}
         installMode={installMode}
-        installAvailable={installPrompt !== null}
         installMessage={installMessage}
         onCandidateNameChange={setCandidateName}
         onInstall={() => void installApp()}

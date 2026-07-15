@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { ToolGuard } from "@/components/tool-guard";
 
 import "./globals.css";
 
@@ -26,7 +27,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ja">
-      <body className="bg-background text-foreground antialiased">{children}</body>
+      <body className="bg-background text-foreground antialiased">
+        <ToolGuard />
+        {children}
+      </body>
     </html>
   );
 }

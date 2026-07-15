@@ -305,7 +305,49 @@ export default function Home() {
         );
       });
     };
-    const onBlur = () => void record("window.blur");
+    type PressedKey = {
+      key: string;
+      code: string;
+      location: number;
+      startedAt: number;
+      repeats: number;
+    };
+    const pressedKeys = new Map<string, PressedKey>();
+    const keyIdentifier = (event: KeyboardEvent) => {
+      let identity = event.code;
+      if (!identity) {
+        identity = event.key;
+      }
+      return `${identity}:${event.location}`;
+    };
+    const keyPayload = (event: KeyboardEvent): JsonObject => ({
+      key: event.key,
+      code: event.code,
+      location: event.location,
+      ctrl: event.ctrlKey,
+      meta: event.metaKey,
+      alt: event.altKey,
+      shift: event.shiftKey,
+      composing: event.isComposing,
+      shortcut: event.ctrlKey || event.metaKey || event.altKey,
+    });
+    const releasePressedKeys = () => {
+      const releasedAt = performance.now();
+      for (const pressed of pressedKeys.values()) {
+        void record("keyboard.interrupted", {
+          key: pressed.key,
+          code: pressed.code,
+          location: pressed.location,
+          repeats: pressed.repeats,
+          durationMs: Math.round(releasedAt - pressed.startedAt),
+        });
+      }
+      pressedKeys.clear();
+    };
+    const onBlur = () => {
+      releasePressedKeys();
+      void record("window.blur");
+    };
     const onFocus = () => void record("window.focus");
     const onResize = () => {
       if (resizeTimer.current) {
@@ -333,22 +375,34 @@ export default function Home() {
       void record("selection.attempt");
     };
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.repeat) {
+      const identifier = keyIdentifier(event);
+      const pressed = pressedKeys.get(identifier);
+      if (pressed) {
+        pressed.repeats += 1;
         return;
       }
-      let category = "character";
-      if (event.ctrlKey || event.metaKey || event.altKey) {
-        category = "shortcut";
-      } else if (event.key.length > 1) {
-        category = "control";
-      }
-      void record("keyboard.input", {
-        category,
-        ctrl: event.ctrlKey,
-        meta: event.metaKey,
-        alt: event.altKey,
-        shift: event.shiftKey,
+      pressedKeys.set(identifier, {
+        key: event.key,
+        code: event.code,
+        location: event.location,
+        startedAt: performance.now(),
+        repeats: 0,
       });
+      void record("keyboard.down", keyPayload(event));
+    };
+    const onKeyUp = (event: KeyboardEvent) => {
+      const identifier = keyIdentifier(event);
+      const pressed = pressedKeys.get(identifier);
+      const payload = keyPayload(event);
+      if (pressed) {
+        payload.repeats = pressed.repeats;
+        payload.durationMs = Math.round(performance.now() - pressed.startedAt);
+        pressedKeys.delete(identifier);
+      } else {
+        payload.repeats = 0;
+        payload.durationMs = 0;
+      }
+      void record("keyboard.up", payload);
     };
 
     document.addEventListener("visibilitychange", onVisibility);
@@ -361,7 +415,8 @@ export default function Home() {
     document.addEventListener("paste", blockClipboard);
     document.addEventListener("contextmenu", blockContextMenu);
     document.addEventListener("selectstart", blockSelection);
-    document.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keydown", onKeyDown, true);
+    window.addEventListener("keyup", onKeyUp, true);
 
     return () => {
       document.removeEventListener("visibilitychange", onVisibility);
@@ -374,7 +429,9 @@ export default function Home() {
       document.removeEventListener("paste", blockClipboard);
       document.removeEventListener("contextmenu", blockContextMenu);
       document.removeEventListener("selectstart", blockSelection);
-      document.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keydown", onKeyDown, true);
+      window.removeEventListener("keyup", onKeyUp, true);
+      pressedKeys.clear();
       if (resizeTimer.current) {
         window.clearTimeout(resizeTimer.current);
       }

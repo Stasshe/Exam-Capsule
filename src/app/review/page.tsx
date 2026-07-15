@@ -129,7 +129,6 @@ export default function ReviewPage() {
                 <th className="px-4 py-3">受理時刻</th>
                 <th className="px-4 py-3">イベント</th>
                 <th className="px-4 py-3">データ</th>
-                <th className="px-4 py-3">ハッシュ</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800">
@@ -142,9 +141,6 @@ export default function ReviewPage() {
                   <td className="px-4 py-3 font-medium">{event.type}</td>
                   <td className="max-w-md px-4 py-3 font-mono text-xs text-slate-400">
                     {formatPayload(event.payload)}
-                  </td>
-                  <td className="px-4 py-3 font-mono text-xs text-slate-500">
-                    {event.eventHash.slice(0, 12)}…
                   </td>
                 </tr>
               ))}

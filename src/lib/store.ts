@@ -218,7 +218,7 @@ export function getSessionReport(session: ExamSession) {
     if (event.type === "viewport.resize") {
       signals.resizeEvents += 1;
     }
-    if (event.type === "keyboard.input" && event.payload.category === "shortcut") {
+    if (event.type === "keyboard.down" && event.payload.shortcut === true) {
       signals.shortcutEvents += 1;
     }
     if (event.type === "content.integrity_failure") {
@@ -266,11 +266,17 @@ export function getSessionReport(session: ExamSession) {
     submittedAt: session.submittedAt,
     risk: { score, level, signals },
     received: {
-      answerCount: answers.length,
-      eventCount: session.events.length,
-      acceptedThrough: session.events.at(-1)?.sequence ?? 0,
+      sessionId: session.id,
+      candidateName: session.candidateName,
+      startedAt: session.startedAt,
+      submittedAt: session.submittedAt,
       answers,
-      events: session.events,
+      events: session.events.map((event) => ({
+        sequence: event.sequence,
+        type: event.type,
+        payload: event.payload,
+        receivedAt: event.receivedAt,
+      })),
     },
   };
 }

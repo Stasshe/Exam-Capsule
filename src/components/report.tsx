@@ -1,4 +1,7 @@
-import type { EvidenceEvent } from "@/lib/evidence";
+"use client";
+
+import { useState } from "react";
+import type { JsonObject } from "@/lib/evidence";
 
 export type ExamReport = {
   risk: {
@@ -16,9 +19,10 @@ export type ExamReport = {
     };
   };
   received: {
-    answerCount: number;
-    eventCount: number;
-    acceptedThrough: number;
+    sessionId: string;
+    candidateName: string;
+    startedAt: string;
+    submittedAt: string | null;
     answers: Array<{
       questionId: string;
       prompt: string;
@@ -27,7 +31,12 @@ export type ExamReport = {
       answeredAt: string;
       correct: boolean;
     }>;
-    events: Array<EvidenceEvent & { receivedAt: string }>;
+    events: Array<{
+      sequence: number;
+      type: string;
+      payload: JsonObject;
+      receivedAt: string;
+    }>;
   };
 };
 
@@ -41,12 +50,25 @@ type ReportProps = {
 };
 
 export function Report({ report, score, questionCount, busy, error, onRetry }: ReportProps) {
+  const [copyStatus, setCopyStatus] = useState("");
   let riskLevel = "低い";
   if (report?.risk.level === "medium") {
     riskLevel = "要確認";
   }
   if (report?.risk.level === "high") {
     riskLevel = "高い";
+  }
+
+  async function copyReceivedData(): Promise<void> {
+    if (!report) {
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(report.received, null, 2));
+      setCopyStatus("コピーしました");
+    } catch {
+      setCopyStatus("コピーできませんでした");
+    }
   }
 
   return (
@@ -94,11 +116,25 @@ export function Report({ report, score, questionCount, busy, error, onRetry }: R
             </div>
           </dl>
           <section>
-            <h3 className="font-semibold">サーバーが受理したデータ</h3>
-            <p className="mt-2 text-sm text-slate-600">
-              回答 {report.received.answerCount}件 · イベント {report.received.eventCount}件 ·
-              最終連番 {report.received.acceptedThrough}
-            </p>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="font-semibold">サーバーが受理したデータ</h3>
+                <p className="mt-1 text-sm text-slate-600">
+                  回答 {report.received.answers.length}件 · イベント {report.received.events.length}
+                  件
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                {copyStatus && <span className="text-xs text-slate-500">{copyStatus}</span>}
+                <button
+                  className="border border-slate-400 bg-white px-3 py-2 text-sm font-semibold hover:border-cyan-700 hover:text-cyan-800"
+                  type="button"
+                  onClick={() => void copyReceivedData()}
+                >
+                  一括コピー
+                </button>
+              </div>
+            </div>
             <details className="mt-3 border border-slate-300">
               <summary className="cursor-pointer px-4 py-3 text-sm font-medium">
                 受理データの全文を表示

@@ -43,8 +43,8 @@ export function Landing({
         <p className="font-mono text-xs tracking-widest text-amber-400">インストールが必要です</p>
         <h2 className="mt-3 text-2xl font-semibold">ブラウザでは受験できません</h2>
         <p className="mt-4 text-sm leading-6 text-slate-400">
-          Exam
-          Capsuleをインストールし、OSのアプリアイコンから起動してください。受験画面は独立したアプリウィンドウで開きます。
+          {"Exam Capsuleをインストールし、OSのアプリアイコンから起動してください。"}
+          受験画面は独立したアプリウィンドウで開きます。
         </p>
         <button
           className="mt-6 w-full bg-cyan-400 px-4 py-3 font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"

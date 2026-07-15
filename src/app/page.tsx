@@ -2,9 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Landing } from "@/components/landing";
+import { type ExamReport, Report } from "@/components/report";
+import { useIntegrity } from "@/hooks/useIntegrity";
 import { messageFromError } from "@/lib/errors";
-import type { EvidenceEvent, JsonObject } from "@/lib/evidence";
+import type { JsonObject } from "@/lib/evidence";
 import { type InstallPromptEvent, isInstalledDisplayMode } from "@/lib/install";
+import type { IntegrityFailure } from "@/lib/integrity";
 import { appendEvidence, countPending, flushEvidence, initializeOutbox } from "@/lib/outbox";
 import type { Question } from "@/lib/questions";
 
@@ -24,36 +27,6 @@ type SessionCredentials = {
   token: string;
   challenge: string;
   candidateName: string;
-};
-
-type ExamReport = {
-  risk: {
-    score: number;
-    level: "low" | "medium" | "high";
-    signals: {
-      fullscreenExits: number;
-      hiddenEvents: number;
-      hiddenDurationSeconds: number;
-      clipboardAttempts: number;
-      focusLosses: number;
-      resizeEvents: number;
-      shortcutEvents: number;
-    };
-  };
-  received: {
-    answerCount: number;
-    eventCount: number;
-    acceptedThrough: number;
-    answers: Array<{
-      questionId: string;
-      prompt: string;
-      optionId: string;
-      selectedLabel: string;
-      answeredAt: string;
-      correct: boolean;
-    }>;
-    events: Array<EvidenceEvent & { receivedAt: string }>;
-  };
 };
 
 type KeyboardNavigator = Navigator & {
@@ -182,6 +155,23 @@ export default function Home() {
     },
     [credentials, refreshPending],
   );
+
+  const reportIntegrityFailure = useCallback(
+    (failure: IntegrityFailure) => {
+      void record("content.integrity_failure", {
+        kind: failure.kind,
+        target: failure.target,
+      });
+    },
+    [record],
+  );
+
+  const integrityFailure = useIntegrity({
+    sessionId: credentials?.sessionId ?? null,
+    question: exam?.question ?? null,
+    active: exam?.status === "active",
+    onFailure: reportIntegrityFailure,
+  });
 
   const flush = useCallback(async () => {
     if (!credentials) {
@@ -599,91 +589,36 @@ export default function Home() {
     submitButtonLabel = "送信中…";
   }
 
-  let riskLevel = "低い";
-  if (report?.risk.level === "medium") {
-    riskLevel = "要確認";
-  }
-  if (report?.risk.level === "high") {
-    riskLevel = "高い";
-  }
-
   let examPanel = (
-    <div className="w-full max-w-2xl border-t-4 border-emerald-600 bg-white p-10 shadow-sm">
-      <p className="font-mono text-xs tracking-widest text-emerald-700">提出確定</p>
-      <h2 className="mt-4 text-4xl font-semibold">試験レポート</h2>
-      <p className="mt-4 text-slate-600">
-        得点: {exam.score} / {exam.questionCount}
-      </p>
-      {!report && <p className="mt-8 text-sm text-slate-500">サーバー受理データを集計中…</p>}
-      {report && (
-        <div className="mt-8 space-y-6">
-          <section className="border border-slate-300 bg-slate-50 p-5">
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              不審度の概算
-            </p>
-            <div className="mt-2 flex items-end gap-3">
-              <strong className="font-mono text-5xl">{report.risk.score}</strong>
-              <span className="pb-1 text-sm text-slate-500">/ 100 · {riskLevel}</span>
-            </div>
-            <p className="mt-3 text-xs leading-5 text-slate-500">
-              不正の証明ではありません。確認対象を選ぶための参考値です。
-            </p>
-          </section>
-          <dl className="grid grid-cols-2 gap-px bg-slate-300 text-sm sm:grid-cols-4">
-            <div className="bg-white p-3">
-              <dt className="text-xs text-slate-500">全画面離脱</dt>
-              <dd className="mt-1 font-mono">{report.risk.signals.fullscreenExits}</dd>
-            </div>
-            <div className="bg-white p-3">
-              <dt className="text-xs text-slate-500">非表示</dt>
-              <dd className="mt-1 font-mono">{report.risk.signals.hiddenEvents}</dd>
-            </div>
-            <div className="bg-white p-3">
-              <dt className="text-xs text-slate-500">Clipboard試行</dt>
-              <dd className="mt-1 font-mono">{report.risk.signals.clipboardAttempts}</dd>
-            </div>
-            <div className="bg-white p-3">
-              <dt className="text-xs text-slate-500">Focus離脱</dt>
-              <dd className="mt-1 font-mono">{report.risk.signals.focusLosses}</dd>
-            </div>
-          </dl>
-          <section>
-            <h3 className="font-semibold">サーバーが受理したデータ</h3>
-            <p className="mt-2 text-sm text-slate-600">
-              回答 {report.received.answerCount}件 · イベント {report.received.eventCount}件 ·
-              最終連番 {report.received.acceptedThrough}
-            </p>
-            <details className="mt-3 border border-slate-300">
-              <summary className="cursor-pointer px-4 py-3 text-sm font-medium">
-                受理データの全文を表示
-              </summary>
-              <pre className="max-h-80 overflow-auto border-t border-slate-300 bg-slate-950 p-4 text-xs text-slate-100">
-                {JSON.stringify(report.received, null, 2)}
-              </pre>
-            </details>
-          </section>
-        </div>
-      )}
-      <button
-        className="mt-7 bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-cyan-700 disabled:opacity-40"
-        type="button"
-        disabled={busy}
-        onClick={() => void retryExam()}
-      >
-        もう一度挑戦する
-      </button>
-      {error && <p className="mt-5 text-sm text-rose-700">{error}</p>}
-    </div>
+    <Report
+      report={report}
+      score={exam.score}
+      questionCount={exam.questionCount}
+      busy={busy}
+      error={error}
+      onRetry={() => void retryExam()}
+    />
   );
   if (exam.status === "active") {
     examPanel = (
-      <div className="w-full max-w-3xl bg-white p-7 shadow-sm sm:p-10">
+      <div
+        className="w-full max-w-3xl bg-white p-7 shadow-sm sm:p-10"
+        data-question-id={exam.question?.id}
+      >
         <p className="font-mono text-xs tracking-widest text-cyan-700">
           問題 {exam.questionNumber}
         </p>
-        <h2 className="mt-5 text-2xl font-semibold leading-relaxed sm:text-3xl">
+        <h2
+          className="mt-5 text-2xl font-semibold leading-relaxed sm:text-3xl"
+          data-question-prompt
+        >
           {exam.question?.prompt}
         </h2>
+        {integrityFailure && (
+          <div className="mt-5 border-l-4 border-rose-600 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+            問題表示の改変を検出しました。回答を停止し、この状態を証跡へ記録しました。
+          </div>
+        )}
         <div className="mt-8 space-y-3">
           {exam.question?.options.map((option) => (
             <label
@@ -698,7 +633,7 @@ export default function Home() {
                 onChange={() => setSelectedOption(option.id)}
               />
               <span className="font-mono text-xs text-slate-500">{option.id.toUpperCase()}</span>
-              <span>{option.label}</span>
+              <span data-option-id={option.id}>{option.label}</span>
             </label>
           ))}
         </div>
@@ -707,7 +642,7 @@ export default function Home() {
           <button
             className="bg-slate-950 px-6 py-3 font-semibold text-white transition hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-40"
             type="button"
-            disabled={busy || !selectedOption}
+            disabled={busy || !selectedOption || integrityFailure !== null}
             onClick={() => void submitAnswer()}
           >
             {submitButtonLabel}

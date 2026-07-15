@@ -192,6 +192,7 @@ export function getSessionReport(session: ExamSession) {
     focusLosses: 0,
     resizeEvents: 0,
     shortcutEvents: 0,
+    integrityFailures: 0,
   };
   let hiddenAt: number | null = null;
 
@@ -220,6 +221,9 @@ export function getSessionReport(session: ExamSession) {
     if (event.type === "keyboard.input" && event.payload.category === "shortcut") {
       signals.shortcutEvents += 1;
     }
+    if (event.type === "content.integrity_failure") {
+      signals.integrityFailures += 1;
+    }
   }
 
   const hiddenDurationRisk = Math.min(30, signals.hiddenDurationSeconds);
@@ -231,7 +235,8 @@ export function getSessionReport(session: ExamSession) {
     signals.clipboardAttempts * 15 +
     signals.focusLosses * 5 +
     signals.resizeEvents * 2 +
-    shortcutRisk;
+    shortcutRisk +
+    signals.integrityFailures * 50;
   const score = Math.min(100, Math.round(rawScore));
   let level: "low" | "medium" | "high" = "low";
   if (score >= 60) {

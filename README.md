@@ -24,6 +24,8 @@ pnpm dev
 - FullscreenとKeyboard Lockの要求、離脱状態と警告音
 - install可能なPWA、standalone app window、browser tabからの受験拒否
 - dockされたDeveloper Toolsの開始前検査
+- 問題文・選択肢の改変、非表示、被覆検出と回答停止
+- CSPと不要browser capabilityの拒否
 - `visibilitychange`、focus、resize、キー種別、選択、クリップボード、context menuの記録。キー長押しrepeatは除外し、選択試行は5秒単位で抑制
 - 受験者、session、時刻を含む動的透かし
 - IndexedDBへ先に保存するevent outbox

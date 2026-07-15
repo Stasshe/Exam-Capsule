@@ -8,6 +8,7 @@ import { messageFromError } from "@/lib/errors";
 import type { JsonObject } from "@/lib/evidence";
 import { type InstallPromptEvent, isInstalledDisplayMode } from "@/lib/install";
 import type { IntegrityFailure } from "@/lib/integrity";
+import { keyboardPayload, keyIdentifier, type PressedKey } from "@/lib/keyboard";
 import { appendEvidence, countPending, flushEvidence, initializeOutbox } from "@/lib/outbox";
 import type { Question } from "@/lib/questions";
 
@@ -305,32 +306,7 @@ export default function Home() {
         );
       });
     };
-    type PressedKey = {
-      key: string;
-      code: string;
-      location: number;
-      startedAt: number;
-      repeats: number;
-    };
     const pressedKeys = new Map<string, PressedKey>();
-    const keyIdentifier = (event: KeyboardEvent) => {
-      let identity = event.code;
-      if (!identity) {
-        identity = event.key;
-      }
-      return `${identity}:${event.location}`;
-    };
-    const keyPayload = (event: KeyboardEvent): JsonObject => ({
-      key: event.key,
-      code: event.code,
-      location: event.location,
-      ctrl: event.ctrlKey,
-      meta: event.metaKey,
-      alt: event.altKey,
-      shift: event.shiftKey,
-      composing: event.isComposing,
-      shortcut: event.ctrlKey || event.metaKey || event.altKey,
-    });
     const releasePressedKeys = () => {
       const releasedAt = performance.now();
       for (const pressed of pressedKeys.values()) {
@@ -388,12 +364,12 @@ export default function Home() {
         startedAt: performance.now(),
         repeats: 0,
       });
-      void record("keyboard.down", keyPayload(event));
+      void record("keyboard.down", keyboardPayload(event, pressedKeys));
     };
     const onKeyUp = (event: KeyboardEvent) => {
       const identifier = keyIdentifier(event);
       const pressed = pressedKeys.get(identifier);
-      const payload = keyPayload(event);
+      const payload = keyboardPayload(event, pressedKeys);
       if (pressed) {
         payload.repeats = pressed.repeats;
         payload.durationMs = Math.round(performance.now() - pressed.startedAt);

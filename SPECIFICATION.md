@@ -24,7 +24,7 @@ active session中、次を意味eventとして記録する。
 - Fullscreen出入り、document表示状態、window focus
 - viewport変更
 - clipboard copy/cut/paste試行、context menu、selection試行
-- browserがpageへ渡したkeydown、keyup。key、code、location、modifier、IME状態を保存する。長押しrepeatは個別eventにせず、keyupの反復回数と押下時間へ集約する。focus離脱などでkeyupを受け取れない押下はinterruptedとして閉じる
+- browserがpageへ渡したkeydown、keyup。key、code、location、modifier、IME状態、押下中key一覧、同時押し表現を保存する。長押しrepeatは個別eventにせず、keyupの反復回数と押下時間へ集約する。focus離脱などでkeyupを受け取れない押下はinterruptedとして閉じる。OSが先に処理してpageへ配送しないsystem shortcutは取得できない
 - 問題文、選択肢の欠落、文字変更、非表示、別要素による被覆
 
 clipboard、context menu、selection、通常UIで抑止する。selection抑止は毎回行うが、証跡は5秒に1件までに制限する。透かし、受験者名、session断片、現在時刻を画面全体に置く。Fullscreen離脱、即表示する。

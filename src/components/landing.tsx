@@ -114,11 +114,9 @@ export function Landing({
         <section className="grid flex-1 items-center gap-12 py-16 lg:grid-cols-[1.2fr_0.8fr]">
           <div>
             <p className="max-w-xl text-4xl font-semibold leading-tight tracking-tight sm:text-6xl">
-              できるだけ不正をしてみろ（パソコン１台の使用のみとする）
-            </p>
+              できるだけ不正をしてみろ            </p>
             <p className="mt-6 max-w-2xl text-base leading-7 text-slate-400">
-              フォーカス、フルスクリーン、キー種別、クリップボード操作、回答進行を監視します。
-              イベントは送信前に端末内でハッシュチェーンへ保存されます。
+               (パソコン１台の使用のみとする)
             </p>
           </div>
           {actionPanel}

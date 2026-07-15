@@ -46,8 +46,8 @@ const config: Config = {
         sm: 'calc(var(--radius) - 4px)',
       },
       fontFamily: {
-        sans: ['var(--font-geist-sans)', 'system-ui', 'sans-serif'],
-        mono: ['var(--font-geist-mono)', 'Consolas', 'monospace'],
+        sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        mono: ['"SFMono-Regular"', 'Consolas', 'monospace'],
       },
       animation: {
         'pulse-slow': 'pulse 2s ease-in-out infinite',

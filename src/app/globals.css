@@ -39,4 +39,14 @@
       "rlig" 1,
       "calt" 1;
   }
+
+  button,
+  input {
+    font: inherit;
+  }
+}
+
+.exam-surface {
+  -webkit-user-select: none;
+  user-select: none;
 }

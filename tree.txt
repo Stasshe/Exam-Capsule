@@ -1,0 +1,69 @@
+.
+├── EVIDENCE_INTENT.md
+├── README.md
+├── SPECIFICATION.md
+├── biome.json
+├── next-env.d.ts
+├── next.config.ts
+├── package.json
+├── pnpm-lock.yaml
+├── pnpm-workspace.yaml
+├── postcss.config.js
+├── public
+│   ├── favicon.png
+│   ├── file.svg
+│   ├── globe.svg
+│   ├── icon-192.svg
+│   ├── icon-512.svg
+│   ├── next.svg
+│   ├── sw.js
+│   └── window.svg
+├── src
+│   ├── app
+│   │   ├── api
+│   │   │   ├── [...path]
+│   │   │   │   └── route.ts
+│   │   │   ├── answers
+│   │   │   ├── events
+│   │   │   ├── exam
+│   │   │   ├── review
+│   │   │   └── sessions
+│   │   ├── globals.css
+│   │   ├── layout.tsx
+│   │   ├── manifest.ts
+│   │   ├── page.tsx
+│   │   └── review
+│   │       └── page.tsx
+│   ├── components
+│   │   ├── landing.tsx
+│   │   ├── report.tsx
+│   │   └── tool-guard.tsx
+│   ├── hooks
+│   │   └── useIntegrity.ts
+│   └── lib
+│       ├── devtools.ts
+│       ├── errors.ts
+│       ├── evidence.ts
+│       ├── http.ts
+│       ├── install.ts
+│       ├── integrity.ts
+│       ├── keyboard.ts
+│       ├── outbox.ts
+│       ├── questions.ts
+│       ├── store.ts
+│       └── validation.ts
+├── tailwind.config.ts
+├── tree.sh
+├── tree.txt
+├── tsconfig.json
+└── tsconfig.tsbuildinfo
+
+15 directories, 44 files
+
+src/*.ts, *.tsx の統計:
+合計行数: 2571
+合計文字数: 81122
+合計ファイルサイズ(bytes): 84530
+
+開発環境の容量:
+879M	.
